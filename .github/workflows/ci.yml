@@ -1,4 +1,4 @@
-name: CI/CD
+name: CI and image release
 on:
   push:
   pull_request:
@@ -80,6 +80,9 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.names.outputs.prefix }}-api:${{ github.ref_name }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha,scope=api
           cache-to: type=gha,mode=max,scope=api
       - name: Publish Web image
@@ -90,33 +93,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.names.outputs.prefix }}-web:${{ github.ref_name }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
-
-  deploy:
-    name: Deploy to demo server
-    needs: publish
-    if: vars.DEPLOY_ENABLED == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: demo
-    permissions:
-      contents: read
-      packages: read
-    steps:
-      - uses: actions/checkout@v4
-      - name: Pull images and update Compose services
-        env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
-          DEPLOY_SSH_PORT: ${{ vars.DEPLOY_SSH_PORT }}
-          DEPLOY_MYSQL_ROOT_PASSWORD: ${{ secrets.DEPLOY_MYSQL_ROOT_PASSWORD }}
-          DEPLOY_MYSQL_PASSWORD: ${{ secrets.DEPLOY_MYSQL_PASSWORD }}
-          DEPLOY_DEMO_PASSWORD: ${{ secrets.DEPLOY_DEMO_PASSWORD }}
-          DEPLOY_PUBLIC_ORIGIN: ${{ vars.DEPLOY_PUBLIC_ORIGIN }}
-          DEPLOY_PUBLIC_BIND: ${{ vars.DEPLOY_PUBLIC_BIND }}
-          DEPLOY_PUBLIC_PORT: ${{ vars.DEPLOY_PUBLIC_PORT }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash deploy/deploy.sh

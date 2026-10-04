@@ -57,7 +57,7 @@ compose.yaml   本地一条命令启动
 
 - [PRD](docs/PRD.md)：角色、业务规则和验收场景。
 - [技术方案](docs/TECHNICAL_DESIGN.md)：架构、数据、API、安全与 Compose 设计。
-- [GitHub Actions](docs/GITHUB_ACTIONS.md)：CI、GHCR 镜像发布和演示服务器部署配置。
+- [GitHub Actions](docs/GITHUB_ACTIONS.md)：CI 与 GHCR 版本镜像发布。
 
 ## 测试与 TDD
 
