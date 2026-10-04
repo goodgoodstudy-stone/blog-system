@@ -1,0 +1,72 @@
+name: blog-engineering-release
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: blog
+      MYSQL_USER: blog
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD -D $$MYSQL_DATABASE -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [internal]
+
+  migrate:
+    image: ${IMAGE_PREFIX:?Set IMAGE_PREFIX}-api:${IMAGE_TAG:?Set IMAGE_TAG}
+    command: ["migrate"]
+    environment: &api-env
+      DB_DSN: blog:${MYSQL_PASSWORD}@tcp(mysql:3306)/blog?parseTime=true&loc=UTC
+      UPLOAD_DIR: /data/uploads
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:?Set DEMO_PASSWORD}
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks: [internal]
+
+  api:
+    image: ${IMAGE_PREFIX}-api:${IMAGE_TAG}
+    restart: unless-stopped
+    environment: *api-env
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/api/v1/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [internal]
+
+  web:
+    image: ${IMAGE_PREFIX}-web:${IMAGE_TAG}
+    restart: unless-stopped
+    ports:
+      - "${PUBLIC_BIND:-127.0.0.1}:${PUBLIC_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [internal]
+
+volumes:
+  mysql_data:
+  uploads:
+
+networks:
+  internal:

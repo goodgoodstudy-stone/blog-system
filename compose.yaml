@@ -1,0 +1,73 @@
+name: blog-engineering-demo
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-local-root-only}
+      MYSQL_DATABASE: blog
+      MYSQL_USER: blog
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-local-blog-only}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD -D $$MYSQL_DATABASE -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [internal]
+
+  migrate:
+    image: blog-api:local
+    build: ./backend
+    command: ["migrate"]
+    environment: &api-env
+      DB_DSN: blog:${MYSQL_PASSWORD:-local-blog-only}@tcp(mysql:3306)/blog?parseTime=true&loc=UTC
+      UPLOAD_DIR: /data/uploads
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:8080}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-Demo12345!}
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks: [internal]
+
+  api:
+    image: blog-api:local
+    build: ./backend
+    environment: *api-env
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/api/v1/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [internal]
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "127.0.0.1:${PUBLIC_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [internal]
+
+volumes:
+  mysql_data:
+  uploads:
+
+networks:
+  internal:

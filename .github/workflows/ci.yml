@@ -1,0 +1,122 @@
+name: CI/CD
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Go formatting
+        run: test -z "$(gofmt -l backend)"
+      - name: Go tests
+        run: cd backend && go test ./... && go vet ./...
+      - name: Frontend checks
+        run: cd frontend && npm ci && npm run lint && npm run build
+      - name: Compose configuration
+        run: docker compose config --quiet
+      - name: Build and start
+        run: docker compose up --build --wait
+      - name: HTTP and MySQL integration
+        run: cd backend && BLOG_BASE_URL=http://localhost:8080 go test ./integration -v
+      - name: Container logs on failure
+        if: failure()
+        run: docker compose logs --tail=120
+      - name: Stop containers
+        if: always()
+        run: docker compose down -v
+
+  publish:
+    name: Publish images to GHCR
+    needs: test
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate release tag
+        shell: bash
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo 'Use a version tag such as v1.0.0 or v1.0.0-rc.1' >&2
+            exit 1
+          fi
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Set image names
+        id: names
+        shell: bash
+        run: echo "prefix=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish API image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.names.outputs.prefix }}-api:${{ github.ref_name }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+      - name: Publish Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: frontend/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.names.outputs.prefix }}-web:${{ github.ref_name }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+  deploy:
+    name: Deploy to demo server
+    needs: publish
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: demo
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pull images and update Compose services
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_SSH_PORT: ${{ vars.DEPLOY_SSH_PORT }}
+          DEPLOY_MYSQL_ROOT_PASSWORD: ${{ secrets.DEPLOY_MYSQL_ROOT_PASSWORD }}
+          DEPLOY_MYSQL_PASSWORD: ${{ secrets.DEPLOY_MYSQL_PASSWORD }}
+          DEPLOY_DEMO_PASSWORD: ${{ secrets.DEPLOY_DEMO_PASSWORD }}
+          DEPLOY_PUBLIC_ORIGIN: ${{ vars.DEPLOY_PUBLIC_ORIGIN }}
+          DEPLOY_PUBLIC_BIND: ${{ vars.DEPLOY_PUBLIC_BIND }}
+          DEPLOY_PUBLIC_PORT: ${{ vars.DEPLOY_PUBLIC_PORT }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash deploy/deploy.sh
