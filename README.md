@@ -12,7 +12,7 @@ docker compose up --build --wait
 
 打开 [http://localhost:8080](http://localhost:8080)。首次启动会建立数据库结构并填入示例内容；再次执行不会重复生成示例文章。仅 Web 服务绑定本机地址，MySQL 和 API 不向宿主机开放端口。
 
-默认配置无需创建 `.env`。如需修改端口或演示密码，可复制 `.env.example` 为 `.env` 并同时保持 `PUBLIC_PORT` 与 `PUBLIC_ORIGIN` 一致；已经生成的演示账号密码不会因修改配置而自动重置。
+默认配置无需创建 `.env`。如需修改端口或演示密码，可复制 `.env.example` 为 `.env`。`PUBLIC_ORIGIN` 填浏览器实际访问的来源（协议、域名和端口，不含路径）；需要同时从多个地址访问时，把其余来源用逗号写入 `ADDITIONAL_ORIGINS`。已经生成的演示账号密码不会因修改配置而自动重置。
 
 | 演示身份 | 邮箱 | 密码 |
 | --- | --- | --- |

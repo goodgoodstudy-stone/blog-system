@@ -25,6 +25,7 @@ services:
       DB_DSN: blog:${MYSQL_PASSWORD:-local-blog-only}@tcp(mysql:3306)/blog?parseTime=true&loc=UTC
       UPLOAD_DIR: /data/uploads
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:8080}
+      ADDITIONAL_ORIGINS: ${ADDITIONAL_ORIGINS:-}
       DEMO_PASSWORD: ${DEMO_PASSWORD:-Demo12345!}
     volumes:
       - uploads:/data/uploads

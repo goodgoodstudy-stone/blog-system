@@ -27,12 +27,12 @@ type Server struct {
 	App        application.Service
 	LoginLimit *loginLimiter
 	UploadDir  string
-	Origin     string
+	Origins    map[string]struct{}
 }
 type userKey struct{}
 
-func New(s mysqlrepo.Store, uploadDir, origin string) http.Handler {
-	server := &Server{Store: s, App: application.Service{Articles: s, Social: s}, LoginLimit: newLoginLimiter(), UploadDir: uploadDir, Origin: origin}
+func New(s mysqlrepo.Store, uploadDir, origin, additionalOrigins string) http.Handler {
+	server := &Server{Store: s, App: application.Service{Articles: s, Social: s}, LoginLimit: newLoginLimiter(), UploadDir: uploadDir, Origins: trustedOrigins(origin, additionalOrigins)}
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID, middleware.RealIP, middleware.Recoverer, server.logRequests, server.authContext, server.checkOrigin)
 	r.Get("/api/v1/health/live", func(w http.ResponseWriter, r *http.Request) { respond(w, 200, map[string]bool{"ok": true}) })
@@ -187,13 +187,23 @@ func (s *Server) authContext(next http.Handler) http.Handler {
 func (s *Server) checkOrigin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" && r.Method != "HEAD" && r.Method != "OPTIONS" {
-			if r.Header.Get("Origin") != s.Origin {
+			if _, ok := s.Origins[r.Header.Get("Origin")]; !ok {
 				fail(w, 403, "bad_origin", "请求来源不受信任")
 				return
 			}
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func trustedOrigins(primary, additional string) map[string]struct{} {
+	origins := map[string]struct{}{primary: {}}
+	for _, origin := range strings.Split(additional, ",") {
+		if origin = strings.TrimSpace(origin); origin != "" {
+			origins[origin] = struct{}{}
+		}
+	}
+	return origins
 }
 
 func sessionToken() (string, error) {
@@ -212,7 +222,7 @@ func (s *Server) setSession(w http.ResponseWriter, r *http.Request, u mysqlrepo.
 	if err = s.Store.CreateSession(r.Context(), u.ID, token, expires); err != nil {
 		return err
 	}
-	http.SetCookie(w, &http.Cookie{Name: "blog_session", Value: token, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: strings.HasPrefix(s.Origin, "https://"), Expires: expires})
+	http.SetCookie(w, &http.Cookie{Name: "blog_session", Value: token, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: strings.HasPrefix(r.Header.Get("Origin"), "https://"), Expires: expires})
 	return nil
 }
 func (s *Server) register(w http.ResponseWriter, r *http.Request) {
@@ -287,7 +297,7 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie("blog_session"); err == nil {
 		_ = s.Store.DeleteSession(r.Context(), c.Value)
 	}
-	http.SetCookie(w, &http.Cookie{Name: "blog_session", Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: strings.HasPrefix(s.Origin, "https://")})
+	http.SetCookie(w, &http.Cookie{Name: "blog_session", Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: strings.HasPrefix(r.Header.Get("Origin"), "https://")})
 	respond(w, 200, map[string]bool{"ok": true})
 }
 func (s *Server) me(w http.ResponseWriter, r *http.Request) {

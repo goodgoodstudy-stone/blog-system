@@ -25,6 +25,7 @@ services:
       DB_DSN: blog:${MYSQL_PASSWORD}@tcp(mysql:3306)/blog?parseTime=true&loc=UTC
       UPLOAD_DIR: /data/uploads
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN}
+      ADDITIONAL_ORIGINS: ${ADDITIONAL_ORIGINS:-}
       DEMO_PASSWORD: ${DEMO_PASSWORD:?Set DEMO_PASSWORD}
     volumes:
       - uploads:/data/uploads

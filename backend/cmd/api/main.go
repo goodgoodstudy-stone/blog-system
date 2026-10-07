@@ -77,7 +77,7 @@ func main() {
 			time.Sleep(24 * time.Hour)
 		}
 	}()
-	handler := httpapi.New(store, uploadDir, getenv("PUBLIC_ORIGIN", "http://localhost:8080"))
+	handler := httpapi.New(store, uploadDir, getenv("PUBLIC_ORIGIN", "http://localhost:8080"), os.Getenv("ADDITIONAL_ORIGINS"))
 	server := &http.Server{Addr: getenv("LISTEN_ADDR", ":8081"), Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}
 	slog.Info("api listening", "address", server.Addr)
 	if err = server.ListenAndServe(); err != nil && err != http.ErrServerClosed {

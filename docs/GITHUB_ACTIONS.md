@@ -38,6 +38,6 @@ docker compose -f compose.release.yaml pull
 docker compose -f compose.release.yaml up -d --wait
 ```
 
-例如本仓库的 `IMAGE_PREFIX` 为 `ghcr.io/goodgoodstudy-stone/blog-system`，`IMAGE_TAG` 为 `v1.0.0`。`PUBLIC_ORIGIN` 必须与浏览器访问地址一致；默认只绑定本机 `127.0.0.1:8080`。运行参数可放在被 `.gitignore` 排除的 `.env` 文件中。若 GHCR 包保持私有，拉取前需由运行方自行登录 GHCR。
+例如本仓库的 `IMAGE_PREFIX` 为 `ghcr.io/goodgoodstudy-stone/blog-system`，`IMAGE_TAG` 为 `v1.0.0`。`PUBLIC_ORIGIN` 应填浏览器访问的主地址，其他可信来源可用 `ADDITIONAL_ORIGINS` 配置；默认只绑定本机 `127.0.0.1:8080`。运行参数可放在被 `.gitignore` 排除的 `.env` 文件中。若 GHCR 包保持私有，拉取前需由运行方自行登录 GHCR。
 
 特定服务器的地址、SSH 凭据、域名和自动更新策略由部署方单独管理，不进入此公开仓库的 Actions 工作流。

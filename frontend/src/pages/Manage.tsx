@@ -244,7 +244,9 @@ function EditorForm({ id, initial }: { id: number; initial?: Article }) {
         target = saved.id;
       }
       const result = await api<Article>(
-        `/manage/articles/${target}/${action}`,
+        action === "delete"
+          ? `/manage/articles/${target}`
+          : `/manage/articles/${target}/${action}`,
         { method: action === "delete" ? "DELETE" : "POST" },
       );
       setVersion(result.version);
