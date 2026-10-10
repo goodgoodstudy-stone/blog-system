@@ -1,7 +1,5 @@
 global:
   scrape_interval: 15s
 
-scrape_configs:
-  - job_name: blog-api
-    static_configs:
-      - targets: ["api:9090"]
+# Alloy scrapes API/MySQL and forwards metrics, including exemplars.
+scrape_configs: []

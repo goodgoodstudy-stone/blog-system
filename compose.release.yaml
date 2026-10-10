@@ -39,7 +39,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *api-env
-      OTLP_ENDPOINT: ${OTLP_ENDPOINT:-}
+      OTLP_ENDPOINT: ${OTLP_ENDPOINT:-} # Set alloy:4318 with the observability profile.
       TRACE_SAMPLE_RATIO: ${TRACE_SAMPLE_RATIO:-0.1}
       OBS_DEBUG_RAW: ${OBS_DEBUG_RAW:-true}
       METRICS_ADDR: :9090
@@ -111,7 +111,7 @@ services:
       - ./deploy/observability/alloy.alloy:/etc/alloy/config.alloy:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - alloy_data:/var/lib/alloy/data
-    depends_on: [loki]
+    depends_on: [loki, tempo, prometheus]
     networks: [internal]
 
   grafana:

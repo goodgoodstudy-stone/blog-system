@@ -209,7 +209,7 @@ docker compose up --build --wait
 
 API 输出结构化日志，包含请求 ID、Trace ID、路由模板、状态码和耗时；错误响应携带请求 ID 供定位。健康检查区分进程存活和依赖就绪。`OBS_DEBUG_RAW` 控制文本正文与 SQL 诊断记录，本地和发布 Compose 均默认开启，具体边界见 [可观测性接入方案](./OBSERVABILITY.md)。
 
-Prometheus 抓取独立内网指标端口，Tempo 接收 OTLP HTTP Trace，Grafana Alloy 采集 API/MySQL stdout 到 Loki，并通过内置 MySQL exporter 采集数据库自身状态。Grafana provisioning 加载运行概览、Go 运行时、MySQL 数据库健康三张看板，支持日志/指标到 Trace 以及 Span 到同一 Trace 日志的跳转。额外演示数据和只读流量脚本均需手动执行。当前未配置告警通知、高可用或完整的主机资源采集。
+Grafana Alloy 统一采集：抓取 API 独立内网指标端口并携带 exemplar remote write 到 Prometheus；接收 API 的 OTLP HTTP Trace，批量转发到 Tempo；采集 API/MySQL stdout 到 Loki，并通过内置 MySQL exporter 采集数据库自身状态。Grafana provisioning 加载运行概览、Go 运行时、MySQL 数据库健康三张看板，支持日志/指标到 Trace 以及 Span 到同一 Trace 日志的跳转。额外演示数据和只读流量脚本均需手动执行。当前未配置告警通知、高可用或完整的主机资源采集。
 
 | 层级 | 重点验证 |
 | --- | --- |

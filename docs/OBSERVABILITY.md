@@ -6,7 +6,7 @@
 
 通过 Grafana 查看 API 的可用性、请求量、错误、延迟和运行资源，沿着 Trace 定位业务与数据库耗时，并跳到同一次请求的详细日志。数据库另有独立看板，读取 MySQL 自身的连接、查询、锁、缓存、I/O 和容量指标。
 
-当前采用 Go OpenTelemetry SDK、Prometheus、Tempo、Loki、Grafana Alloy 和 Grafana。Alloy 负责 Docker 日志与 MySQL 指标采集，替代原先的日志采集方案；API 的 Trace 直接通过 OTLP HTTP 发到 Tempo。没有额外的独立 MySQL exporter 容器，也没有单独部署 OTel Collector。
+当前采用 Go OpenTelemetry SDK、Prometheus、Tempo、Loki、Grafana Alloy 和 Grafana。Alloy 统一负责 API/MySQL 指标抓取、Docker 日志采集与 OTLP Trace 接收，分别转发到 Prometheus、Loki 和 Tempo。没有额外的独立 MySQL exporter 容器，也没有单独部署 OTel Collector。
 
 本地和发布 Compose 均默认开启 `OBS_DEBUG_RAW=true`，按本次接入要求保留文本请求/响应原文及 SQL 参数、结果。它是明确的调试配置：日志可能包含密码、会话相关值和文章正文，不能将这套配置描述成自动脱敏的生产基线。其实际捕获边界见第 5 节。
 
@@ -16,12 +16,13 @@
 flowchart LR
     Web[Web / Nginx] -->|业务 HTTP| API[Go API]
     API -->|业务 SQL| DB[(MySQL)]
-    P[Prometheus] -->|抓取 :9090/metrics| API
-    API -->|OTLP HTTP :4318| T[Tempo]
-    Docker[API / MySQL 容器 stdout] --> A[Grafana Alloy]
+    A[Grafana Alloy] -->|抓取 :9090/metrics| API
+    API -->|OTLP HTTP :4318| A
+    A -->|批量 OTLP HTTP :4318| T[Tempo]
+    Docker[API / MySQL 容器 stdout] --> A
     A -->|日志| L[Loki]
     A -->|内置 mysqld_exporter 查询| DB
-    A -->|remote write :9090/api/v1/write| P
+    A -->|remote write :9090/api/v1/write| P[Prometheus]
     G[Grafana] --> P
     G --> T
     G --> L
@@ -29,13 +30,13 @@ flowchart LR
 
 | 组件 | 固定镜像版本 | 作用与端口 |
 | --- | --- | --- |
-| Prometheus | `prom/prometheus:v3.5.0` | 内网 `9090`；抓 API、接收 MySQL remote write；开启 exemplar 存储。 |
-| Tempo | `grafana/tempo:2.8.2` | 内网 `4318` 接收 Trace，`3200` 提供查询；本地文件存储。 |
+| Prometheus | `prom/prometheus:v3.5.0` | 内网 `9090`；接收 Alloy 的 API/MySQL remote write；开启 exemplar 存储。 |
+| Tempo | `grafana/tempo:2.8.2` | 内网 `4318` 接收 Alloy 转发的 Trace，`3200` 提供查询；本地文件存储。 |
 | Loki | `grafana/loki:3.5.0` | 内网 `3100`；存储和查询日志，单实例文件存储。 |
-| Alloy | `grafana/alloy:v1.20.1` | Docker 日志发现与采集、MySQL exporter、指标转发。 |
+| Alloy | `grafana/alloy:v1.20.1` | 内网 `4318` 接收 OTLP HTTP Trace；Docker 日志、API 指标和 MySQL exporter 采集及转发。 |
 | Grafana | `grafana/grafana:12.0.2` | 默认绑定 `127.0.0.1:3000`；自动配置数据源和看板。 |
 
-五个组件都属于 `observability` profile。普通 Compose 启动仍可单独运行博客。API 指标监听 `:9090`，业务监听 `:8081`，两个 HTTP Server 独立启动和退出；API、MySQL、Prometheus、Tempo、Loki 不发布宿主机端口。Nginx 对外部 `/metrics` 返回 404，API 业务路由也不提供此路径。
+五个组件都属于 `observability` profile。普通 Compose 启动仍可单独运行博客。API 指标监听 `:9090`，业务监听 `:8081`，两个 HTTP Server 独立启动和退出；API、MySQL、Alloy、Prometheus、Tempo、Loki 不发布宿主机端口。Nginx 对外部 `/metrics` 返回 404，API 业务路由也不提供此路径。
 
 MySQL、上传文件及各可观测组件均有持久化卷。`docker compose down` 保留卷，`down -v` 会删除数据，应只在明确需要重置时执行。Loki/Tempo 当前未配置显式日志或 Trace 留存期限；落盘不等于备份、灾备或长期留存方案。
 
@@ -43,7 +44,7 @@ MySQL、上传文件及各可观测组件均有持久化卷。`docker compose do
 
 ### 3.1 本地启动
 
-首次配置时复制 `.env.example` 为 `.env`，将 `OTLP_ENDPOINT` 改为 `tempo:4318`。已有 `.env` 时直接修改对应项，然后运行：
+首次配置时复制 `.env.example` 为 `.env`，将 `OTLP_ENDPOINT` 改为 `alloy:4318`。已有 `.env` 时直接修改对应项，然后运行：
 
 ```bash
 docker compose --profile observability up --build --wait -d
@@ -65,9 +66,20 @@ docker compose --profile observability up -d --no-deps --force-recreate api
 docker compose -f compose.release.yaml --profile observability up --wait -d
 ```
 
+本地和发布均设置 `OTLP_ENDPOINT=alloy:4318`，只启用普通博客服务时保持为空。迁移旧环境时将原来的 `tempo:4318` 改为 `alloy:4318`，再应用采集与服务配置：
+
+```bash
+docker compose --profile observability up -d --force-recreate alloy prometheus
+docker compose --profile observability up -d --no-deps --force-recreate api
+```
+
+发布环境使用相同命令时，在 `docker compose` 后加上 `-f compose.release.yaml`。
+
+Alloy 的 `otelcol.receiver.otlp` 监听内网 `0.0.0.0:4318`，Trace 经过 `otelcol.processor.batch`（1 秒超时、1024 Span 发送阈值）和 `otelcol.exporter.otlphttp` 转发到 `http://tempo:4318`。exporter 开启内存发送队列（1000 个批次）及失败重试（最长 300 秒）；队列不是持久化缓冲，重启或持续故障时仍可能丢失 Trace。采样仍由应用的 `TRACE_SAMPLE_RATIO` 控制，Alloy 没有额外采样。Trace ID、Span ID 和日志关联不变。
+
 | 变量 | 本地默认 | 发布默认 | 说明 |
 | --- | --- | --- | --- |
-| `OTLP_ENDPOINT` | 空 | 空 | 设置为 `tempo:4318` 才导出 Trace；格式为 `host:port`，当前使用内网明文 HTTP。 |
+| `OTLP_ENDPOINT` | 空 | 空 | 设置为 `alloy:4318` 才导出 Trace；格式为 `host:port`，当前使用内网明文 HTTP。 |
 | `TRACE_SAMPLE_RATIO` | `1` | `0.1` | 范围 0～1，采用 ParentBased + TraceIDRatioBased；上游采样决定也会影响结果。 |
 | `OBS_DEBUG_RAW` | `true` | `true` | 文本原文及 SQL 诊断开关；设为 `false` 关闭详细原文日志。 |
 | `METRICS_ADDR` | Compose 固定 `:9090` | Compose 固定 `:9090` | 进程在 Compose 外单独运行时默认 `127.0.0.1:9090`。 |
@@ -82,7 +94,7 @@ docker compose -f compose.release.yaml --profile observability up --wait -d
 
 ## 4. API 与资源指标
 
-Prometheus 每 15 秒抓取 `api:9090/metrics`，`job=blog-api`。请求计数使用 `method`、路由模板 `route`、状态码 `status`；耗时直方图使用 `method`、`route`。无法匹配的路径统一为 `unmatched`，文章 ID、请求 ID 和 Trace ID 不进入普通指标标签。
+Alloy 每 15 秒抓取 `api:9090/metrics`，保留 `job=blog-api`、`instance=api:9090`，通过 remote write 写入 Prometheus。Prometheus 不再重复抓取 API，避免重复样本。API 的 `up` 抓取状态也由 Alloy 写入，因此 Prometheus Targets 页面为空是预期行为，应查询 `up{job="blog-api"}` 查看抓取状态。请求计数使用 `method`、路由模板 `route`、状态码 `status`；耗时直方图使用 `method`、`route`。无法匹配的路径统一为 `unmatched`，文章 ID、请求 ID 和 Trace ID 不进入普通指标标签。
 
 | 指标 | 含义 |
 | --- | --- |
@@ -99,7 +111,7 @@ Prometheus 每 15 秒抓取 `api:9090/metrics`，`job=blog-api`。请求计数�
 
 健康检查 `/api/v1/health/live` 和 `/api/v1/health/ready` 仍计指标，但不写请求与正文日志。业务看板通过路由条件排除它们，以避免低流量时健康检查占满业务图。健康检查 Trace 未被专门排除，Traces Drilldown 中的速率与业务 QPS 因而不一定相同。
 
-已采样请求的耗时指标附带 `trace_id` exemplar，使用 OpenMetrics 输出；Prometheus 启用 `exemplar-storage` 保存它，Grafana 延迟趋势查询开启 exemplar 展示。它不会给每个 Trace 创建独立时间序列。
+已采样请求的耗时指标附带 `trace_id` exemplar，使用 OpenMetrics 输出；Alloy remote write 显式开启 `send_exemplars`，Prometheus 启用 `exemplar-storage` 保存它，Grafana 延迟趋势查询开启 exemplar 展示。它不会给每个 Trace 创建独立时间序列。
 
 5xx 比例、延迟阈值和连接使用率颜色是排查参考，当前没有配置告警规则、通知渠道或 SLO。无业务请求时延迟分位数可能为 NaN，首页将其显示为“无请求”。API 抓取状态证明指标端口可访问，不等同于业务流程全部正常。
 
@@ -209,8 +221,8 @@ Alloy 的 `prometheus.exporter.mysql` 内置 mysqld_exporter，读取全局状�
 | `backend/internal/httpapi/metrics.go`、`debuglog.go`、`server.go` | HTTP 指标、原文捕获、关联日志与路由命名。 |
 | `backend/internal/mysqlrepo/debug.go` | DB/Tx SQL 参数与扫描结果日志包装器。 |
 | `backend/internal/application/article.go`、`mysqlrepo/articles.go`、`social.go` | 业务与数据库子 Span。 |
-| `deploy/observability/prometheus.yaml` | API 抓取配置。 |
-| `deploy/observability/alloy.alloy` | Docker 日志、内置 MySQL exporter、标签修正与 remote write。 |
+| `deploy/observability/prometheus.yaml` | Prometheus 配置；不再直接抓取 API，统一接收 Alloy remote write。 |
+| `deploy/observability/alloy.alloy` | OTLP 接收/批量转发、API 指标抓取、Docker 日志、内置 MySQL exporter、标签修正与 remote write。 |
 | `deploy/observability/tempo.yaml`、`loki.yaml` | Trace/日志存储与查询服务。 |
 | `deploy/observability/grafana-datasources.yaml` | 数据源及日志、指标、Trace 跳转。 |
 | `deploy/observability/grafana-dashboards.yaml`、`dashboards/` | 看板 provisioning 与 JSON。 |
@@ -264,6 +276,13 @@ docker compose exec -T prometheus wget -qO- http://api:9090/metrics
 - 开启 Prometheus exemplar 存储后，查询实际返回 18 条 exemplar，其中的 Trace ID 已在 Tempo 验证存在；Grafana 延迟趋势面板也已加载 exemplar 开关。
 - MySQL stdout 被 Alloy 采集，Loki 能查询到启动日志与其中的警告；这是实际日志，不是合成故障。
 
+2026-10-10 统一迁移到 Alloy 后补充验证：
+
+- Alloy 配置验证、本地 Compose 及发布 Compose（普通/可观测 profile）解析通过；运行中的 API 确认使用 `OTLP_ENDPOINT=alloy:4318`。
+- Prometheus 直接抓取 Targets 为零；Alloy 转发的 `up{job="blog-api",instance="api:9090"}` 和 `mysql_up{job="blog-mysql"}` 均为 1。
+- 120 次只读演示请求返回 105 次 200、15 次预期 404；新请求的 Trace 在 Tempo 查询成功，同一 Trace 在 Loki 查到 30 条关联日志。
+- 迁移后的时间范围查到 2 条新 exemplar，其中的 Trace ID 在 Tempo 验证存在，确认 API → Alloy → Prometheus 的 exemplar 转发链路成立。
+
 上述结果是一次环境验收记录，不能代替后续环境里的实际检查。exemplar 端到端验收需要 Prometheus 查询返回 exemplar 且对应 ID 在 Tempo 存在，仅验证 API 文本里有 exemplar 不足以证明整条链路成立。
 
 ### 10.2 常见问题
@@ -271,11 +290,12 @@ docker compose exec -T prometheus wget -qO- http://api:9090/metrics
 | 现象 | 排查与处理 |
 | --- | --- |
 | Traces Drilldown 报 `empty ring` | 核对 Tempo `metrics_generator` 的存储与 `local-blocks` 处理器，重建 Tempo 后生成新请求。 |
-| Trace ID 存在但打不开 | 检查 API 容器实际 `OTLP_ENDPOINT`、采样率与 exporter 错误；确认查询使用 `traceId` 类型，考虑批量导出延迟与留存范围。 |
+| Trace ID 存在但打不开 | 检查 API 容器实际 `OTLP_ENDPOINT=alloy:4318`、采样率、API exporter 与 Alloy OTLP 转发错误；确认查询使用 `traceId` 类型，考虑批量导出延迟与留存范围。 |
 | 精确 Trace ID 的 Loki 查询出现其他请求 | 使用 `| json | traceId="..."`；不要把 ID 写成 JSON 提取参数。 |
 | Loki 标签很少 | 请求 ID、Trace ID、状态等字段保留在 JSON 正文，先解析再过滤。 |
 | Span 跳转只出现部分日志 | 检查时间窗口、行数上限和日志是否被采集；当前按 Trace ID 查请求相关日志，不保证无限量返回。 |
-| 延迟图没有 exemplar | 检查采样、OpenMetrics 输出、Prometheus `exemplar-storage` 与面板的 exemplar 开关，并生成新请求。 |
+| 延迟图没有 exemplar | 检查采样、OpenMetrics 输出、Alloy remote write 的 `send_exemplars`、Prometheus `exemplar-storage` 与面板的 exemplar 开关，并生成新请求。 |
+| API 指标无数据 | 查询 `up{job="blog-api"}`，检查 Alloy 的 API scrape 和 remote write；Prometheus Targets 为空是统一采集后的预期状态。 |
 | MySQL 面板无数据 | 检查账号连接、Alloy exporter、`job=blog-mysql` relabel 与 Prometheus remote-write receiver；不要只检查 Prometheus 的 API Targets。 |
 | `slave_status` 权限错误 | 当前已禁用该采集器；需要复制监控时另建专用监控账号和授权。 |
 | MySQL 日志面板为空 | 调整时间范围；无新事件时为空是正常的。新接入的历史日志可能在 Loki ingester 刷盘后才能被历史范围查询找到。 |

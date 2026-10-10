@@ -1,3 +1,46 @@
+// API traces use the same collector as logs and metrics.
+otelcol.receiver.otlp "api" {
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+
+  output {
+    traces = [otelcol.processor.batch.traces.input]
+  }
+}
+
+otelcol.processor.batch "traces" {
+  timeout = "1s"
+  send_batch_size = 1024
+
+  output {
+    traces = [otelcol.exporter.otlphttp.tempo.input]
+  }
+}
+
+otelcol.exporter.otlphttp "tempo" {
+  client {
+    endpoint = "http://tempo:4318"
+  }
+
+  sending_queue {
+    enabled = true
+    queue_size = 1000
+  }
+
+  retry_on_failure {
+    enabled = true
+    max_elapsed_time = "300s"
+  }
+}
+
+prometheus.scrape "api" {
+  targets = [{"__address__" = "api:9090"}]
+  job_name = "blog-api"
+  scrape_interval = "15s"
+  forward_to = [prometheus.remote_write.local.receiver]
+}
+
 discovery.docker "containers" {
   host = "unix:///var/run/docker.sock"
 
@@ -96,5 +139,6 @@ prometheus.relabel "mysql" {
 prometheus.remote_write "local" {
   endpoint {
     url = "http://prometheus:9090/api/v1/write"
+    send_exemplars = true
   }
 }
