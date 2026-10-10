@@ -31,7 +31,7 @@ func getenv(k, v string) string {
 	return v
 }
 func main() {
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	slog.SetDefault(slog.New(observ.NewLogHandler(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}), prometheus.DefaultRegisterer)))
 	if err := run(); err != nil {
 		slog.Error("api failed", "error", err)
 		os.Exit(1)
@@ -114,7 +114,7 @@ func run() error {
 		shutdownContext, done := context.WithTimeout(context.Background(), 5*time.Second)
 		defer done()
 		if err := shutdownTracer(shutdownContext); err != nil {
-			slog.Error("tracer shutdown failed", "error", err)
+			observ.LogFailure(shutdownContext, "tracer shutdown failed", err, "event", "tracer_shutdown")
 		}
 	}()
 	debugRaw := strings.EqualFold(os.Getenv("OBS_DEBUG_RAW"), "true")
@@ -124,7 +124,7 @@ func run() error {
 		for {
 			maintenanceContext, done := context.WithTimeout(context.Background(), 30*time.Second)
 			if err := store.Cleanup(maintenanceContext, uploadDir); err != nil {
-				slog.Error("maintenance failed", "error", err)
+				observ.LogFailure(maintenanceContext, "maintenance failed", err, "event", "maintenance")
 			}
 			done()
 			time.Sleep(24 * time.Hour)
@@ -145,9 +145,6 @@ func run() error {
 	select {
 	case <-signalContext.Done():
 	case err = <-serveErrors:
-		if err != http.ErrServerClosed {
-			slog.Error("http server stopped", "error", err)
-		}
 	}
 	shutdownContext, done := context.WithTimeout(context.Background(), 10*time.Second)
 	defer done()

@@ -1,0 +1,65 @@
+groups:
+  - name: blog-request-health
+    interval: 15s
+    rules:
+      - alert: BlogAPIMetricsUnavailable
+        expr: absent(up{job="blog-api"}) or (up{job="blog-api"} == 0)
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API 指标采集不可用"
+          description: "检查 API 指标端口、Alloy 抓取和 remote write；不等同于业务健康检查。"
+      - alert: BlogInternalJSONOrPanic
+        expr: sum by (job, instance, event) (increase(blog_log_entries_total{job="blog-api",level="error",event=~"json_response_encode|json_request_decode|panic"}[5m])) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: "出现内部 JSON 异常或 panic"
+          description: "内部不变量被破坏。按 event 查看 ERROR 日志，再通过 traceId 定位请求。"
+      - alert: BlogErrorLogs
+        expr: sum by (job, instance) (increase(blog_log_entries_total{job="blog-api",level="error"}[5m])) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: "API 出现 ERROR 日志"
+          description: "最近 5 分钟存在 ERROR 记录；查看异常分类和日志。日志条数不等于失败请求数。"
+      - alert: BlogWarningBurst
+        expr: sum by (job, instance) (increase(blog_log_entries_total{job="blog-api",level="warn",event!="invalid_request_json"}[5m])) >= 10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API WARN 日志持续增加"
+          description: "最近 5 分钟非输入格式 WARN 达到 10 条，并持续 1 分钟。检查下游超时和遥测导出。"
+      - alert: BlogDownstreamTimeouts
+        expr: sum by (job, instance) (increase(blog_log_entries_total{job="blog-api",level="warn",event="downstream_timeout"}[5m])) >= 3
+        labels:
+          severity: warning
+        annotations:
+          summary: "下游超时频繁"
+          description: "最近 5 分钟至少 3 次下游超时；检查 MySQL 延迟、连接池及同一 Trace 的 SQL 日志。"
+      - alert: BlogDownstreamFailureRatio
+        expr: (sum by (job, instance, dependency) (rate(blog_downstream_requests_total{job="blog-api",outcome="failure"}[5m])) / clamp_min(sum by (job, instance, dependency) (rate(blog_downstream_requests_total{job="blog-api"}[5m])), 1e-9) > 0.05) and (sum by (job, instance, dependency) (increase(blog_downstream_requests_total{job="blog-api"}[5m])) >= 20)
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "下游操作失败率超过 5%"
+          description: "5 分钟内至少 20 次操作、失败率超过 5%，并持续 2 分钟。空结果不算 SQL 失败。"
+      - alert: BlogAPI5xxRatio
+        expr: (sum by (job, instance) (rate(http_requests_total{job="blog-api",route!~"/api/v1/health/.*",status=~"5.."}[5m])) / clamp_min(sum by (job, instance) (rate(http_requests_total{job="blog-api",route!~"/api/v1/health/.*"}[5m])), 1e-9) > 0.01) and (sum by (job, instance) (increase(http_requests_total{job="blog-api",route!~"/api/v1/health/.*"}[5m])) >= 20)
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "入口请求 5xx 比例超过 1%"
+          description: "5 分钟内至少 20 个业务请求、5xx 超过 1%，并持续 2 分钟；4xx 单独展示。"
+      - alert: BlogAPIHighLatency
+        expr: (histogram_quantile(0.95, sum by (job, instance, le) (rate(http_request_duration_seconds_bucket{job="blog-api",route!~"/api/v1/health/.*"}[5m]))) > 1) and (sum by (job, instance) (increase(http_request_duration_seconds_count{job="blog-api",route!~"/api/v1/health/.*"}[5m])) >= 20)
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "入口请求 p95 超过 1 秒"
+          description: "5 分钟内至少 20 个业务请求，p95 超过 1 秒持续 5 分钟；先看下游耗时，再点 exemplar 查 Trace。"

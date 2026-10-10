@@ -38,6 +38,8 @@ Grafana 的 Traces Drilldown 使用 TraceQL 的 `rate()` 查询；Tempo 配置�
 
 本地默认全量采样，`compose.release.yaml` 默认采样率为 10%，可用 `TRACE_SAMPLE_RATIO` 调整。未设置 `OTLP_ENDPOINT` 时不导出追踪，适合普通 `docker compose up`。发布环境启动可观测 profile 前应设置独立的 Grafana 管理员密码。API 通过 OTLP HTTP 将 Trace 发到 Alloy，由 Alloy 批量转发到 Tempo。Grafana Alloy 从 Docker socket 读取 API 和 MySQL 容器 stdout 日志并发送到 Loki；该 socket 即使以只读方式挂载也具有敏感权限，只应在受信任的 Docker 主机上启用。
 
+首页按资源概览、入口请求、下游访问、耗时、异常/告警组织。入口日志包含成功状态、查询参数及请求/响应正文；MySQL 操作记录参数、结果、成功/失败和含结果读取的耗时。默认 logger 输出 WARN/ERROR 时自动增加 `blog_log_entries_total{level,event}`；内部 JSON 异常/panic 用 ERROR，下游超时用 WARN。已配置 8 条 Prometheus 告警规则并在首页展示 pending/firing，暂未接外部通知；规则和口径见接入方案第 11 节。
+
 | 演示身份 | 邮箱 | 密码 |
 | --- | --- | --- |
 | 管理员 | `admin@blog.local` | `Demo12345!` |

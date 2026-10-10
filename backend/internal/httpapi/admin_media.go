@@ -3,12 +3,15 @@ package httpapi
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"blog-system/backend/internal/mysqlrepo"
 )
 
 func (s *Server) users(w http.ResponseWriter, r *http.Request) {
@@ -20,7 +23,7 @@ func (s *Server) users(w http.ResponseWriter, r *http.Request) {
 		failErr(w, r, err)
 		return
 	}
-	respond(w, 200, v)
+	respond(w, r, 200, v)
 }
 func (s *Server) role(w http.ResponseWriter, r *http.Request) {
 	if requireAdmin(w, r) == nil {
@@ -28,14 +31,17 @@ func (s *Server) role(w http.ResponseWriter, r *http.Request) {
 	}
 	id, err := paramID(r)
 	if err != nil {
-		fail(w, 404, "not_found", "用户不存在")
+		fail(w, r, 404, "not_found", "用户不存在")
 		return
 	}
 	var v struct {
 		Role string `json:"role"`
 	}
-	if decode(r, &v) != nil || v.Role != "reader" && v.Role != "author" {
-		fail(w, 400, "validation", "角色只能是普通用户或博主")
+	if !decodeRequest(w, r, &v) {
+		return
+	}
+	if v.Role != "reader" && v.Role != "author" {
+		fail(w, r, 400, "validation", "角色只能是普通用户或博主")
 		return
 	}
 	if err = s.Store.SetRole(r.Context(), id, v.Role); err != nil {
@@ -47,7 +53,7 @@ func (s *Server) role(w http.ResponseWriter, r *http.Request) {
 		failErr(w, r, err)
 		return
 	}
-	respond(w, 200, u)
+	respond(w, r, 200, u)
 }
 func (s *Server) createTag(w http.ResponseWriter, r *http.Request) {
 	if requireAdmin(w, r) == nil {
@@ -56,8 +62,11 @@ func (s *Server) createTag(w http.ResponseWriter, r *http.Request) {
 	var v struct {
 		Name string `json:"name"`
 	}
-	if decode(r, &v) != nil || strings.TrimSpace(v.Name) == "" || len([]rune(v.Name)) > 80 {
-		fail(w, 400, "validation", "请输入 1–80 字的标签名")
+	if !decodeRequest(w, r, &v) {
+		return
+	}
+	if strings.TrimSpace(v.Name) == "" || len([]rune(v.Name)) > 80 {
+		fail(w, r, 400, "validation", "请输入 1–80 字的标签名")
 		return
 	}
 	t, err := s.Store.CreateTag(r.Context(), v.Name)
@@ -65,7 +74,7 @@ func (s *Server) createTag(w http.ResponseWriter, r *http.Request) {
 		failErr(w, r, err)
 		return
 	}
-	respond(w, 201, t)
+	respond(w, r, 201, t)
 }
 func (s *Server) updateTag(w http.ResponseWriter, r *http.Request) {
 	if requireAdmin(w, r) == nil {
@@ -73,21 +82,24 @@ func (s *Server) updateTag(w http.ResponseWriter, r *http.Request) {
 	}
 	id, err := paramID(r)
 	if err != nil {
-		fail(w, 404, "not_found", "标签不存在")
+		fail(w, r, 404, "not_found", "标签不存在")
 		return
 	}
 	var v struct {
 		Name string `json:"name"`
 	}
-	if decode(r, &v) != nil || strings.TrimSpace(v.Name) == "" || len([]rune(v.Name)) > 80 {
-		fail(w, 400, "validation", "请输入 1–80 字的标签名")
+	if !decodeRequest(w, r, &v) {
+		return
+	}
+	if strings.TrimSpace(v.Name) == "" || len([]rune(v.Name)) > 80 {
+		fail(w, r, 400, "validation", "请输入 1–80 字的标签名")
 		return
 	}
 	if err = s.Store.UpdateTag(r.Context(), id, v.Name); err != nil {
 		failErr(w, r, err)
 		return
 	}
-	respond(w, 200, map[string]bool{"ok": true})
+	respond(w, r, 200, map[string]bool{"ok": true})
 }
 func (s *Server) deleteTag(w http.ResponseWriter, r *http.Request) {
 	if requireAdmin(w, r) == nil {
@@ -95,14 +107,14 @@ func (s *Server) deleteTag(w http.ResponseWriter, r *http.Request) {
 	}
 	id, err := paramID(r)
 	if err != nil {
-		fail(w, 404, "not_found", "标签不存在")
+		fail(w, r, 404, "not_found", "标签不存在")
 		return
 	}
 	if err = s.Store.DeleteTag(r.Context(), id); err != nil {
 		failErr(w, r, err)
 		return
 	}
-	respond(w, 200, map[string]bool{"ok": true})
+	respond(w, r, 200, map[string]bool{"ok": true})
 }
 
 func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request) {
@@ -112,12 +124,12 @@ func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 10<<20+1024)
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		fail(w, 413, "too_large", "图片不能超过 10 MB")
+		fail(w, r, 413, "too_large", "图片不能超过 10 MB")
 		return
 	}
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		fail(w, 400, "validation", "请选择图片")
+		fail(w, r, 400, "validation", "请选择图片")
 		return
 	}
 	defer file.Close()
@@ -130,7 +142,7 @@ func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request) {
 	mime := http.DetectContentType(buf[:n])
 	ext := map[string]string{"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}[mime]
 	if ext == "" {
-		fail(w, 400, "invalid_image", "只支持 JPG、PNG、WebP 图片")
+		fail(w, r, 400, "invalid_image", "只支持 JPG、PNG、WebP 图片")
 		return
 	}
 	if _, err = file.Seek(0, io.SeekStart); err != nil {
@@ -156,27 +168,28 @@ func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request) {
 	size, err := io.Copy(out, io.LimitReader(file, 10<<20+1))
 	closeErr := out.Close()
 	if err != nil || closeErr != nil {
-		_ = os.Remove(path)
-		fail(w, 500, "upload_failed", "图片保存失败")
+		removeUpload(w, r, path)
+		logRequestFailure(w, r, "upload file write failed", errors.Join(err, closeErr), "upload_write")
+		fail(w, r, 500, "upload_failed", "图片保存失败")
 		return
 	}
 	if size > 10<<20 {
-		_ = os.Remove(path)
-		fail(w, 413, "too_large", "图片不能超过 10 MB")
+		removeUpload(w, r, path)
+		fail(w, r, 413, "too_large", "图片不能超过 10 MB")
 		return
 	}
 	img, err := s.Store.CreateImage(r.Context(), u.ID, name, mime, size)
 	if err != nil {
-		_ = os.Remove(path)
+		removeUpload(w, r, path)
 		failErr(w, r, err)
 		return
 	}
-	respond(w, 201, map[string]any{"id": img.ID, "url": "/api/v1/images/" + strconv.FormatInt(img.ID, 10)})
+	respond(w, r, 201, map[string]any{"id": img.ID, "url": "/api/v1/images/" + strconv.FormatInt(img.ID, 10)})
 }
 func (s *Server) image(w http.ResponseWriter, r *http.Request) {
 	id, err := paramID(r)
 	if err != nil {
-		fail(w, 404, "not_found", "图片不存在")
+		fail(w, r, 404, "not_found", "图片不存在")
 		return
 	}
 	img, err := s.Store.GetImage(r.Context(), id)
@@ -192,13 +205,22 @@ func (s *Server) image(w http.ResponseWriter, r *http.Request) {
 		a, e := s.Store.GetArticle(r.Context(), img.ArticleID.Int64, 0)
 		if e == nil {
 			allowed = a.Status == "published" || (u != nil && (u.Role == "admin" || u.ID == a.AuthorID))
+		} else if !errors.Is(e, mysqlrepo.ErrNotFound) {
+			failErr(w, r, e)
+			return
 		}
 	}
 	if !allowed {
-		fail(w, 404, "not_found", "图片不存在或暂不可访问")
+		fail(w, r, 404, "not_found", "图片不存在或暂不可访问")
 		return
 	}
 	w.Header().Set("Content-Type", img.Mime)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	http.ServeFile(w, r, filepath.Join(s.UploadDir, img.Filename))
+}
+
+func removeUpload(w http.ResponseWriter, r *http.Request, path string) {
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		logRequestFailure(w, r, "upload cleanup failed", err, "upload_cleanup")
+	}
 }

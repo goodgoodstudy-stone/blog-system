@@ -113,7 +113,7 @@ Alloy 每 15 秒抓取 `api:9090/metrics`，保留 `job=blog-api`、`instance=ap
 
 已采样请求的耗时指标附带 `trace_id` exemplar，使用 OpenMetrics 输出；Alloy remote write 显式开启 `send_exemplars`，Prometheus 启用 `exemplar-storage` 保存它，Grafana 延迟趋势查询开启 exemplar 展示。它不会给每个 Trace 创建独立时间序列。
 
-5xx 比例、延迟阈值和连接使用率颜色是排查参考，当前没有配置告警规则、通知渠道或 SLO。无业务请求时延迟分位数可能为 NaN，首页将其显示为“无请求”。API 抓取状态证明指标端口可访问，不等同于业务流程全部正常。
+5xx 比例、延迟阈值和连接使用率颜色是排查参考。Prometheus 已配置第 11 节的告警规则；尚未配置外部通知渠道或 SLO。无业务请求时延迟分位数可能为 NaN，首页将其显示为“无请求”。API 抓取状态证明指标端口可访问，不等同于业务流程全部正常。
 
 ## 5. 日志与原文记录
 
@@ -123,7 +123,8 @@ API 使用 `slog` JSON 输出到 stdout。Alloy 通过 `discovery.docker`、`dis
 | --- | --- |
 | `requestId` | 对应 HTTP 响应头 `X-Request-ID`，定位一次请求。 |
 | `traceId`、`spanId` | 与当前请求的 Trace/Span 关联。JSON 正文字段使用驼峰命名。 |
-| `method`、`route`、`status`、`durationMs` | HTTP 请求概况。 |
+| `method`、`route`、`query`、`status`、`success`、`durationMs` | 入口请求参数、结果状态与耗时。`success` 为状态码 < 400；4xx/5xx 分开展示。 |
+| `event`、`dependency`、`operation`、`outcome`、`queryId` | 异常分类和下游操作关联；下游摘要含 `success`、`durationMs`，原文开启时带 SQL/args 与结果。 |
 | `msg` | 区分请求、正文、SQL 查询、行结果、查询结束与异常。 |
 | `queryId` | 进程内 SQL 查询序号，用于配对 SQL 与结果；不能用作跨进程全局 ID。 |
 | `part`、`body` | 正文分块序号与文本。 |
@@ -210,7 +211,7 @@ Alloy 的 `prometheus.exporter.mysql` 内置 mysqld_exporter，读取全局状�
 
 | 看板 | UID / 文件 | 内容 |
 | --- | --- | --- |
-| 博客系统 · 运行概览 | `blog-api-overview` / `api-overview.json` | 30 个面板，含 API 请求、资源、连接池、MySQL 摘要及日志；顶部进入 MySQL 详情。 |
+| 博客系统 · 运行概览 | `blog-api-overview` / `api-overview.json` | 44 个面板项（含 5 个分组），按资源摘要、入口、下游、耗时、异常/告警组织；顶部可跳 Go 运行时和 MySQL 看板。 |
 | 博客 API · Go 运行时 | `blog-go-runtime` / `go-runtime.json` | 10 个面板，RSS、Go 堆、CPU 核数、协程、线程、GC、文件描述符。 |
 | MySQL · 数据库健康 | `blog-mysql-health` / `mysql-health.json` | 32 个面板项，包含分组标题和说明，覆盖第 7 节指标与日志。 |
 
@@ -221,6 +222,9 @@ Alloy 的 `prometheus.exporter.mysql` 内置 mysqld_exporter，读取全局状�
 | `backend/internal/httpapi/metrics.go`、`debuglog.go`、`server.go` | HTTP 指标、原文捕获、关联日志与路由命名。 |
 | `backend/internal/mysqlrepo/debug.go` | DB/Tx SQL 参数与扫描结果日志包装器。 |
 | `backend/internal/application/article.go`、`mysqlrepo/articles.go`、`social.go` | 业务与数据库子 Span。 |
+| `backend/internal/observ/logging.go` | WARN/ERROR 自动计数、固定事件分类、请求/Trace 关联与超时级别。 |
+| `backend/internal/mysqlrepo/metrics.go` | 下游操作成功/失败计数、含结果读取的耗时与访问摘要。 |
+| `deploy/observability/alerts.yaml` | 入口、下游、日志与内部异常的 8 条 Prometheus 告警规则。 |
 | `deploy/observability/prometheus.yaml` | Prometheus 配置；不再直接抓取 API，统一接收 Alloy remote write。 |
 | `deploy/observability/alloy.alloy` | OTLP 接收/批量转发、API 指标抓取、Docker 日志、内置 MySQL exporter、标签修正与 remote write。 |
 | `deploy/observability/tempo.yaml`、`loki.yaml` | Trace/日志存储与查询服务。 |
@@ -263,6 +267,10 @@ go vet ./...
 docker compose --profile observability config --quiet
 docker compose exec -T alloy alloy validate /etc/alloy/config.alloy
 docker compose exec -T prometheus wget -qO- http://api:9090/metrics
+
+# 验证告警规则语法和关键阈值行为（包含客户端 JSON 不触发系统故障）。
+docker compose --profile observability run --rm --no-deps --entrypoint /bin/promtool prometheus check config /etc/prometheus/prometheus.yaml
+docker compose --profile observability run --rm --no-deps --entrypoint /bin/promtool -v "$PWD/deploy/observability/alerts.test.yaml:/tmp/alerts.test.yaml:ro" prometheus test rules /tmp/alerts.test.yaml
 ```
 
 具备所需发布变量时，也应检查 `docker compose -f compose.release.yaml --profile observability config --quiet`。针对已运行的本地博客，可显式设置 `BLOG_BASE_URL=http://localhost:8080` 执行 `go test ./integration -count=1`，该产品旅程测试会新增测试账号、文章和图片，应在测试环境运行。
@@ -285,6 +293,15 @@ docker compose exec -T prometheus wget -qO- http://api:9090/metrics
 
 上述结果是一次环境验收记录，不能代替后续环境里的实际检查。exemplar 端到端验收需要 Prometheus 查询返回 exemplar 且对应 ID 在 Tempo 存在，仅验证 API 文本里有 exemplar 不足以证明整条链路成立。
 
+2026-10-10 按请求/下游/异常重组后补充验收：
+
+- Go 全量测试 44 项通过，vet 通过；日志 handler 与 HTTP/MySQL 打点的 race 检查通过。测试覆盖自动 WARN/ERROR 计数、固定事件分类、包装后的超时、内部 JSON 错误、panic、SQL Scan/迭代错误、空结果及重复 Close/Commit 后 Rollback 的计数边界。
+- 本地/发布 Compose 解析、Prometheus 配置及 8 条规则验证通过；规则单测验证内部 JSON ERROR 触发、超时 WARN 触发、普通输入 JSON WARN 不触发系统故障告警，以及 WARN 突增的持续时间门槛。
+- Grafana 实际加载 44 个面板项；通过 Grafana 数据源代理执行首页 40 条 Prometheus、5 条 Loki 查询，均成功。
+- 80 次只读演示请求返回 70 次 200、10 次预期 404；非法 JSON 请求返回 400，在 Loki 查到 WARN、失败访问摘要、请求/响应正文，Prometheus 同时读到 WARN 增量，ERROR 保持 0。
+- 明确验证了 404 对应的 SQL 查询摘要为 success=true、empty=true，不包含伪造的零值结果或 error 字段；显式运行的产品旅程集成测试通过（会创建测试内容）。
+- 容器构建曾因默认 Go module proxy 超时失败，本次运行验证采用本机已缓存依赖交叉编译 Linux/arm64 二进制并使用相同 Alpine 基础镜像/用户设置构建。仓库 Dockerfile 保留原有构建方式；部署时仍需可访问的依赖源。
+
 ### 10.2 常见问题
 
 | 现象 | 排查与处理 |
@@ -302,4 +319,67 @@ docker compose exec -T prometheus wget -qO- http://api:9090/metrics
 | 没有业务流量时分位数无值 | 检查抓取 UP 后生成读取流量；无样本不代表服务故障。 |
 | Docker Hub 拉取超时或限流 | 本次曾使用用户提供的 `docker.1ms.run` 拉取缺失镜像并标记为 Compose 所用名称；镜像代理只是环境下载手段，仓库保留官方镜像名称与固定版本。 |
 
-当前是可复现的单实例接入：还需要另行设计告警与通知、明确留存及容量控制、监控账号隔离、多环境日志隔离、TLS/鉴权、备份和高可用，才能作为完整的线上运维方案。
+当前是可复现的单实例接入：还需要接入 Alertmanager/外部通知、明确留存及容量控制、监控账号隔离、多环境日志隔离、TLS/鉴权、备份和高可用，才能作为完整的线上运维方案。
+
+
+## 11. 请求、下游、异常打点与告警
+
+### 11.1 以请求为单位排查
+
+首页按以下顺序组织，排除入口健康检查流量：
+
+1. **资源**：首页保留服务/数据库资源摘要，完整指标在 Go 运行时和 MySQL 自身健康看板。
+2. **入口**：请求量/QPS、2xx/3xx 成功、4xx 客户端失败、5xx 服务失败、成功率与 p95；访问摘要、请求体和响应体分别展示。摘要记录 query 参数、success、状态和耗时。正文按 part 分块，继续保持 `OBS_DEBUG_RAW=true`。
+3. **下游**：当前下游为 MySQL，显示操作量、成功/失败、失败率、超时次数和耗时；`downstream request` 记录 SQL 模板、args、结果状态、rows、durationMs。多行 values/columns、受影响行数等在 `mysql row/result` 展示，按 traceId/queryId 关联。SQL 仍参数化执行。
+4. **耗时**：入口及下游 p50/p95/p99、最慢路由与连接池；下游延迟 Histogram 同样携带 Trace exemplar。查询耗时包含连接等待、执行和结果读取；部分读取后 Close 只统计实际读取范围。
+5. **异常/告警**：WARN、ERROR、内部 JSON、panic、客户端 JSON 格式异常，以及 Prometheus pending/firing 状态；展开异常日志并跳 Trace。首页顶部的 trace_id 文本框仅过滤日志，不改变总体指标或告警状态，留空展示全部。
+
+### 11.2 日志级别及自动监控
+
+默认 `slog` handler 统一输出 JSON，并统计 `blog_log_entries_total{level,event}`。每条成功交给输出 handler 的 WARN/ERROR 记录增加一次计数；With/WithGroup 派生 logger 共用计数器。指标由 Alloy 抓取后 remote write 到 Prometheus，与 Loki 的日志存储相互独立，计数不表示 Loki 已入库。
+
+`level` 仅为 `warn`/`error`；`event` 只允许源码中固定的分类，未指定或未知分类统一为 `other`。不将错误文本、SQL、URL、请求 ID 或 Trace ID 加入指标标签。所有固定事件在进程启动时初始化为零，以便采集首个异常前建立基线。INFO 正文、SQL 参数/结果日志不增加 WARN/ERROR 计数。
+
+| 场景 | 日志级别 / event | 处理 |
+| --- | --- | --- |
+| 内部响应 JSON 编码失败 | ERROR / `json_response_encode` | 提交响应头之前编码，失败返回有效 JSON 的 500 响应。 |
+| 内部请求解码目标错误、非预期请求读取异常 | ERROR / `json_request_decode` | 返回 500；不伪装为客户端格式错误。当前仓库没有其他内部持久化 JSON 解析流程，未来新增时也应显式记录 ERROR。 |
+| 客户端 JSON 语法/字段类型错误、未知字段、多个 JSON 值、空体或体积超限 | WARN / `invalid_request_json` | 返回 400，单独展示，不作为内部 JSON 故障告警。 |
+| 下游 deadline 或网络 Timeout | WARN / `downstream_timeout` | 请求边界记录一次，返回 504；readiness 仍返回 503，后台清理按 maintenance 分类。 |
+| 请求取消 | WARN / `request_canceled` | 返回 408；响应写入时连接断开/超时也记 WARN。 |
+| 非预期 DB/业务错误 | ERROR / `request_failure` | 返回 500；登录/会话查询不会把 DB 故障隐藏成 401，收藏与图片关联查询也保留真实 DB 错误。 |
+| Panic | ERROR / `panic` | 记录堆栈；响应未开始时返回 500，仍完成入口指标。`http.ErrAbortHandler` 按标准语义继续中止。 |
+| 响应写入、上传写入/清理异常 | ERROR 或超时/断连 WARN / `response_write`、`upload_write`、`upload_cleanup` | 记录真实异常；不会记录成成功保存。 |
+| OTLP 导出失败 | WARN / `telemetry_export` | 记录 SDK 异步导出错误；请求本身可能仍然成功。 |
+| 404、权限拒绝、版本冲突、正常认证失败等预期业务结果 | 不自动产生 WARN/ERROR | 仍有入口状态及成功/失败指标、请求日志。 |
+
+异常在处理错误的 HTTP/后台边界记录一次，避免每层重复记录同一错误。SQL 的逐次访问摘要是 INFO，含 success/outcome/error；失败操作同时进入下游失败指标，传播到处理边界时才记录 WARN/ERROR。日志计数不等于失败请求数，一次请求可能有多种异常，后台异常也没有入口请求。
+
+### 11.3 下游指标口径
+
+| 指标 | 标签 / 口径 |
+| --- | --- |
+| `blog_downstream_requests_total` | `dependency=mysql`、固定 `operation=query/exec/begin/commit/rollback`、`outcome=success/failure`。 |
+| `blog_downstream_duration_seconds` | `dependency`、`operation`；从调用开始到返回/读取完成，单位秒。 |
+| `blog_log_entries_total` | `level`、固定 `event`；覆盖前述日志事件。 |
+
+QueryRow 在 Scan 完成时计数；Query 在读取结束或 Close 时计数，Scan 或迭代错误计为失败，同一结果集重复 Close 不重复计数。`sql.ErrNoRows` 表示查询成功但无匹配数据，计成功；SQL 执行拒绝（例如唯一键冲突）属于下游操作失败，即使入口按预期返回 409，也不自动产生 ERROR 日志。Commit 后的 defer Rollback 是无效回滚，不统计成额外操作。只访问 MySQL exporter 的数据库采集不属于 API 下游指标。
+
+### 11.4 告警规则
+
+规则文件为 `deploy/observability/alerts.yaml`，本地和发布 Compose 都挂载，Prometheus 每 15 秒评估。以下是当前初始阈值，应结合真实业务流量调整：
+
+| 告警 | 条件 | 级别 |
+| --- | --- | --- |
+| `BlogAPIMetricsUnavailable` | up 缺失/为 0 持续 1 分钟 | critical |
+| `BlogInternalJSONOrPanic` | 5 分钟内内部 JSON ERROR 或 panic 增量 > 0 | critical |
+| `BlogErrorLogs` | 5 分钟内任意 ERROR 增量 > 0 | critical |
+| `BlogWarningBurst` | 5 分钟内非输入格式 WARN ≥ 10，持续 1 分钟 | warning |
+| `BlogDownstreamTimeouts` | 5 分钟内下游超时 WARN ≥ 3 | warning |
+| `BlogDownstreamFailureRatio` | 5 分钟至少 20 次操作且失败率 > 5%，持续 2 分钟 | warning |
+| `BlogAPI5xxRatio` | 5 分钟至少 20 个业务请求且 5xx > 1%，持续 2 分钟 | critical |
+| `BlogAPIHighLatency` | 5 分钟至少 20 个业务请求且 p95 > 1 秒，持续 5 分钟 | warning |
+
+WARN/ERROR 原始计数每次日志都增加，告警另按窗口与阈值评估。首次启动采集前、进程退出前未被抓取的增量可能不进入 Prometheus；终止/崩溃事件仍需查 Loki 日志和采集可用性，不能承诺逐条告警送达。`increase()` 是按抓取点估算的增量，可能为小数；日志精确条数以 Loki 查询为准。
+
+目前提供告警状态，未部署 Alertmanager 或配置邮件/IM/Webhook 通知。可在首页查看 pending/firing；Prometheus 规则 API 为内网 `/api/v1/rules`。`BlogInternalJSONOrPanic` 与通用 ERROR 告警会同时出现，未来接通知时应做分组和抑制。

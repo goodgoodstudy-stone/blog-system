@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "API 请求、运行资源、数据库连接池和 MySQL 状态的实时概览；健康检查请求从业务指标中排除。",
+  "description": "资源概览置顶，随后按入口请求、下游访问、耗时和重点异常排查；请求体/响应体、SQL 参数/结果、WARN/ERROR 自动计数和 Prometheus 告警状态。",
   "editable": false,
   "graphTooltip": 1,
   "id": null,
@@ -15,9 +15,31 @@
       "targetBlank": false,
       "includeVars": false,
       "icon": "dashboard"
+    },
+    {
+      "title": "Go 运行时资源",
+      "type": "link",
+      "url": "/d/blog-go-runtime",
+      "keepTime": true,
+      "targetBlank": false,
+      "includeVars": false,
+      "icon": "dashboard"
     }
   ],
   "panels": [
+    {
+      "id": 135,
+      "title": "1 · 服务与数据库资源摘要",
+      "type": "row",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      }
+    },
     {
       "id": 1,
       "title": "抓取状态",
@@ -27,10 +49,10 @@
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": 4,
-        "w": 4,
         "x": 0,
-        "y": 0
+        "y": 1,
+        "w": 4,
+        "h": 4
       },
       "fieldConfig": {
         "defaults": {
@@ -99,359 +121,6 @@
       ]
     },
     {
-      "id": 2,
-      "title": "请求总数",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 4,
-        "y": 0
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "decimals": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "sum(http_requests_total{job=\"blog-api\",route!~\"/api/v1/health/.*\"}) or vector(0)",
-          "legendFormat": "",
-          "range": true,
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 3,
-      "title": "吞吐 QPS",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 0
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "decimals": 3,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "reqps"
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "sum(rate(http_requests_total{job=\"blog-api\",route!~\"/api/v1/health/.*\"}[$__rate_interval])) or vector(0)",
-          "legendFormat": "",
-          "range": true,
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 4,
-      "title": "5xx 错误率",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 12,
-        "y": 0
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "decimals": 2,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 5
-              }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "100 * (sum(rate(http_requests_total{job=\"blog-api\",route!~\"/api/v1/health/.*\",status=~\"5..\"}[$__rate_interval])) or vector(0)) / clamp_min((sum(rate(http_requests_total{job=\"blog-api\",route!~\"/api/v1/health/.*\"}[$__rate_interval])) or vector(0)), 1e-9)",
-          "legendFormat": "",
-          "range": true,
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 5,
-      "title": "延迟 p95",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 16,
-        "y": 0
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "decimals": 1,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 200
-              },
-              {
-                "color": "red",
-                "value": 1000
-              }
-            ]
-          },
-          "unit": "ms",
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "nan",
-                "result": {
-                  "text": "无请求"
-                }
-              }
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"blog-api\",route!~\"/api/v1/health/.*\"}[$__rate_interval])))",
-          "legendFormat": "",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "description": "统计窗口内没有业务请求时显示“无请求”。"
-    },
-    {
-      "id": 6,
-      "title": "延迟 p99",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 0
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "decimals": 1,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 500
-              },
-              {
-                "color": "red",
-                "value": 2000
-              }
-            ]
-          },
-          "unit": "ms",
-          "mappings": [
-            {
-              "type": "special",
-              "options": {
-                "match": "nan",
-                "result": {
-                  "text": "无请求"
-                }
-              }
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "1000 * histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"blog-api\",route!~\"/api/v1/health/.*\"}[$__rate_interval])))",
-          "legendFormat": "",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "description": "统计窗口内没有业务请求时显示“无请求”。"
-    },
-    {
       "id": 13,
       "title": "API 内存 RSS",
       "type": "stat",
@@ -460,10 +129,10 @@
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": 4,
+        "x": 4,
+        "y": 1,
         "w": 4,
-        "x": 0,
-        "y": 4
+        "h": 4
       },
       "fieldConfig": {
         "defaults": {
@@ -522,10 +191,10 @@
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": 4,
+        "x": 8,
+        "y": 1,
         "w": 4,
-        "x": 4,
-        "y": 4
+        "h": 4
       },
       "fieldConfig": {
         "defaults": {
@@ -576,68 +245,6 @@
       "description": ""
     },
     {
-      "id": 15,
-      "title": "Goroutines",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 4
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "decimals": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "sum(go_goroutines{job=\"blog-api\"})",
-          "legendFormat": "",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "description": ""
-    },
-    {
       "id": 16,
       "title": "MySQL 状态",
       "type": "stat",
@@ -646,10 +253,10 @@
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": 4,
-        "w": 4,
         "x": 12,
-        "y": 4
+        "y": 1,
+        "w": 4,
+        "h": 4
       },
       "fieldConfig": {
         "defaults": {
@@ -719,192 +326,6 @@
       "description": ""
     },
     {
-      "id": 17,
-      "title": "MySQL 连接数",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 16,
-        "y": 4
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "decimals": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "mysql_global_status_threads_connected{job=\"blog-mysql\"}",
-          "legendFormat": "",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "description": ""
-    },
-    {
-      "id": 18,
-      "title": "MySQL 查询 / 秒",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 4
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "decimals": 2,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "ops"
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "rate(mysql_global_status_questions{job=\"blog-mysql\"}[$__rate_interval])",
-          "legendFormat": "",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "description": "包含监控采集自身的查询。"
-    },
-    {
-      "id": 19,
-      "title": "API 数据库连接占用",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 0,
-        "y": 8
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "decimals": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "blog_db_connections_in_use{job=\"blog-api\"}",
-          "legendFormat": "",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "description": ""
-    },
-    {
       "id": 20,
       "title": "API 连接池使用率",
       "type": "stat",
@@ -913,10 +334,10 @@
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": 4,
+        "x": 16,
+        "y": 1,
         "w": 4,
-        "x": 4,
-        "y": 8
+        "h": 4
       },
       "fieldConfig": {
         "defaults": {
@@ -975,138 +396,6 @@
       "description": ""
     },
     {
-      "id": 21,
-      "title": "API 连接等待 / 分钟",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 8
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "decimals": 2,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "60 * rate(blog_db_connection_waits_total{job=\"blog-api\"}[$__rate_interval])",
-          "legendFormat": "",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "description": ""
-    },
-    {
-      "id": 22,
-      "title": "MySQL 连接使用率",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 12,
-        "y": 8
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "decimals": 1,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 70
-              },
-              {
-                "color": "red",
-                "value": 90
-              }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "100 * mysql_global_status_threads_connected{job=\"blog-mysql\"} / clamp_min(mysql_global_variables_max_connections{job=\"blog-mysql\"},1)",
-          "legendFormat": "",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "description": ""
-    },
-    {
       "id": 23,
       "title": "MySQL 慢查询 / 分钟",
       "type": "stat",
@@ -1115,10 +404,10 @@
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": 4,
+        "x": 20,
+        "y": 1,
         "w": 4,
-        "x": 16,
-        "y": 8
+        "h": 4
       },
       "fieldConfig": {
         "defaults": {
@@ -1169,39 +458,292 @@
       "description": ""
     },
     {
-      "id": 24,
-      "title": "InnoDB 缓冲命中率",
+      "id": 101,
+      "title": "2 · 入口流量 — 成功 / 失败、请求与响应",
+      "type": "row",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 102,
+      "title": "业务请求 / 秒",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": 4,
+        "x": 0,
+        "y": 6,
         "w": 4,
-        "x": 20,
-        "y": 8
+        "h": 4
       },
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "thresholds"
           },
-          "decimals": 2,
+          "decimals": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "green",
                 "value": null
-              },
-              {
-                "color": "orange",
-                "value": 95
-              },
+              }
+            ]
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(http_requests_total{job=\"blog-api\",route!~\"/api/v1/health/.*\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": "",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "description": "健康检查排除。增量为采样估算；4xx 是请求失败，不自动等于服务端错误日志。"
+    },
+    {
+      "id": 103,
+      "title": "成功请求 · 所选时间",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 6,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
               {
                 "color": "green",
-                "value": 99
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(increase(http_requests_total{job=\"blog-api\",route!~\"/api/v1/health/.*\",status=~\"[23]..\"}[$__range])) or vector(0)",
+          "legendFormat": "",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "description": "健康检查排除。增量为采样估算；4xx 是请求失败，不自动等于服务端错误日志。"
+    },
+    {
+      "id": 104,
+      "title": "客户端失败 4xx · 所选时间",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 6,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(increase(http_requests_total{job=\"blog-api\",route!~\"/api/v1/health/.*\",status=~\"4..\"}[$__range])) or vector(0)",
+          "legendFormat": "",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "description": "健康检查排除。增量为采样估算；4xx 是请求失败，不自动等于服务端错误日志。"
+    },
+    {
+      "id": 105,
+      "title": "服务失败 5xx · 所选时间",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 6,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(increase(http_requests_total{job=\"blog-api\",route!~\"/api/v1/health/.*\",status=~\"5..\"}[$__range])) or vector(0)",
+          "legendFormat": "",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "description": "健康检查排除。增量为采样估算；4xx 是请求失败，不自动等于服务端错误日志。"
+    },
+    {
+      "id": 106,
+      "title": "入口成功率",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 6,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1230,28 +772,90 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "100 * (1 - rate(mysql_global_status_innodb_buffer_pool_reads{job=\"blog-mysql\"}[$__rate_interval]) / clamp_min(rate(mysql_global_status_innodb_buffer_pool_read_requests{job=\"blog-mysql\"}[$__rate_interval]),1e-9))",
+          "expr": "100 * (sum(rate(http_requests_total{job=\"blog-api\",route!~\"/api/v1/health/.*\",status=~\"[23]..\"}[$__rate_interval])) or vector(0)) / clamp_min(sum(rate(http_requests_total{job=\"blog-api\",route!~\"/api/v1/health/.*\"}[$__rate_interval])),1e-9)",
           "legendFormat": "",
           "range": true,
           "refId": "A"
         }
       ],
-      "description": "计算实际磁盘读取与逻辑读取的比例；空闲时可能暂无样本。"
+      "description": "健康检查排除。增量为采样估算；4xx 是请求失败，不自动等于服务端错误日志。"
     },
     {
-      "id": 7,
-      "title": "吞吐 · 按路由",
-      "description": "路由模板作为标签，避免按文章 ID 生成高基数时间序列。",
+      "id": 107,
+      "title": "入口 p95",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 6,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "1000 * histogram_quantile(0.95,sum by(le)(rate(http_request_duration_seconds_bucket{job=\"blog-api\",route!~\"/api/v1/health/.*\"}[$__rate_interval])))",
+          "legendFormat": "",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "description": "健康检查排除。增量为采样估算；4xx 是请求失败，不自动等于服务端错误日志。"
+    },
+    {
+      "id": 108,
+      "title": "入口请求 · 按状态码",
+      "description": "",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 0,
-        "y": 12
+        "y": 10,
+        "w": 12,
+        "h": 8
       },
       "fieldConfig": {
         "defaults": {
@@ -1286,7 +890,62 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "topk(10, sum by (route) (rate(http_requests_total{job=\"blog-api\",route!~\"/api/v1/health/.*\"}[$__rate_interval])))",
+          "expr": "sum by(status)(rate(http_requests_total{job=\"blog-api\",route!~\"/api/v1/health/.*\"}[$__rate_interval]))",
+          "legendFormat": "{{status}}",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 109,
+      "title": "入口请求 · 按路由",
+      "description": "",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 10,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never"
+          },
+          "min": 0,
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "topk(10,sum by(route)(rate(http_requests_total{job=\"blog-api\",route!~\"/api/v1/health/.*\"}[$__rate_interval])))",
           "legendFormat": "{{route}}",
           "range": true,
           "refId": "A"
@@ -1294,8 +953,465 @@
       ]
     },
     {
-      "id": 8,
-      "title": "状态码 · 每秒请求",
+      "id": 110,
+      "title": "入口访问记录 · 成功、状态与耗时",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 12,
+        "h": 10
+      },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{service=\"api\"} | json | traceId=~\"${trace_id:regex}.*\" | msg=\"http request\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "description": "展开日志查看 method、route、query、success、status、durationMs；点击 Trace 链接查看瀑布图。"
+    },
+    {
+      "id": 111,
+      "title": "入口请求体 / 响应体 · 按 Trace 关联",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 18,
+        "w": 12,
+        "h": 10
+      },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{service=\"api\"} | json | traceId=~\"${trace_id:regex}.*\" | msg=~\"http request body|http response body\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "description": "顶部 trace_id 可限定同一次请求。正文按 part 分块；完整原文日志由 OBS_DEBUG_RAW 控制。"
+    },
+    {
+      "id": 112,
+      "title": "3 · 下游访问 — 参数、结果与操作状态",
+      "type": "row",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 113,
+      "title": "MySQL 操作 / 秒",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(blog_downstream_requests_total{job=\"blog-api\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": "",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "description": "这是 API 访问 MySQL 的操作指标；MySQL 自身健康见独立看板。Query 包含结果读取，空结果视为 SQL 成功。"
+    },
+    {
+      "id": 114,
+      "title": "下游成功 · 所选时间",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 29,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(increase(blog_downstream_requests_total{job=\"blog-api\",outcome=\"success\"}[$__range])) or vector(0)",
+          "legendFormat": "",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "description": "这是 API 访问 MySQL 的操作指标；MySQL 自身健康见独立看板。Query 包含结果读取，空结果视为 SQL 成功。"
+    },
+    {
+      "id": 115,
+      "title": "下游失败 · 所选时间",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 29,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(increase(blog_downstream_requests_total{job=\"blog-api\",outcome=\"failure\"}[$__range])) or vector(0)",
+          "legendFormat": "",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "description": "这是 API 访问 MySQL 的操作指标；MySQL 自身健康见独立看板。Query 包含结果读取，空结果视为 SQL 成功。"
+    },
+    {
+      "id": 116,
+      "title": "下游失败率",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 29,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "100 * sum(rate(blog_downstream_requests_total{job=\"blog-api\",outcome=\"failure\"}[$__rate_interval])) / clamp_min(sum(rate(blog_downstream_requests_total{job=\"blog-api\"}[$__rate_interval])),1e-9)",
+          "legendFormat": "",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "description": "这是 API 访问 MySQL 的操作指标；MySQL 自身健康见独立看板。Query 包含结果读取，空结果视为 SQL 成功。"
+    },
+    {
+      "id": 117,
+      "title": "下游超时 · 最近 5 分钟",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 29,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(increase(blog_log_entries_total{job=\"blog-api\",event=\"downstream_timeout\",level=\"warn\"}[5m])) or vector(0)",
+          "legendFormat": "",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "description": "这是 API 访问 MySQL 的操作指标；MySQL 自身健康见独立看板。Query 包含结果读取，空结果视为 SQL 成功。"
+    },
+    {
+      "id": 118,
+      "title": "下游 p95",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 29,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "1000 * histogram_quantile(0.95,sum by(le)(rate(blog_downstream_duration_seconds_bucket{job=\"blog-api\"}[$__rate_interval])))",
+          "legendFormat": "",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "description": "这是 API 访问 MySQL 的操作指标；MySQL 自身健康见独立看板。Query 包含结果读取，空结果视为 SQL 成功。"
+    },
+    {
+      "id": 119,
+      "title": "下游成功 / 失败 · 按操作",
       "description": "",
       "type": "timeseries",
       "datasource": {
@@ -1303,10 +1419,10 @@
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": 8,
+        "x": 0,
+        "y": 33,
         "w": 12,
-        "x": 12,
-        "y": 12
+        "h": 8
       },
       "fieldConfig": {
         "defaults": {
@@ -1341,16 +1457,16 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (status) (rate(http_requests_total{job=\"blog-api\",route!~\"/api/v1/health/.*\"}[$__rate_interval]))",
-          "legendFormat": "HTTP {{status}}",
+          "expr": "sum by(operation,outcome)(rate(blog_downstream_requests_total{job=\"blog-api\"}[$__rate_interval]))",
+          "legendFormat": "{{operation}} · {{outcome}}",
           "range": true,
           "refId": "A"
         }
       ]
     },
     {
-      "id": 9,
-      "title": "响应延迟 · 分位数",
+      "id": 120,
+      "title": "下游 p95 · 按操作",
       "description": "",
       "type": "timeseries",
       "datasource": {
@@ -1358,10 +1474,151 @@
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": 8,
+        "x": 12,
+        "y": 33,
         "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never"
+          },
+          "min": 0,
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "1000 * histogram_quantile(0.95,sum by(operation,le)(rate(blog_downstream_duration_seconds_bucket{job=\"blog-api\"}[$__rate_interval])))",
+          "legendFormat": "{{operation}}",
+          "range": true,
+          "refId": "A",
+          "exemplar": true
+        }
+      ]
+    },
+    {
+      "id": 121,
+      "title": "下游访问记录 · SQL 参数、结果与耗时",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
         "x": 0,
-        "y": 20
+        "y": 41,
+        "w": 12,
+        "h": 10
+      },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{service=\"api\"} | json | traceId=~\"${trace_id:regex}.*\" | event=\"downstream_request\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "description": "展开查看 dependency、operation、sql、args、success、rows、durationMs、error。多行结果见右侧 mysql row/result，按 queryId 关联。"
+    },
+    {
+      "id": 122,
+      "title": "下游返回详情 · 每行结果 / 受影响行数",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 41,
+        "w": 12,
+        "h": 10
+      },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{service=\"api\"} | json | traceId=~\"${trace_id:regex}.*\" | msg=~\"mysql row|mysql result\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "description": "完整原文开启时显示 values、columns、rowsAffected 和 lastInsertId；通过 traceId/queryId 关联。"
+    },
+    {
+      "id": 123,
+      "title": "4 · 耗时定位 — 入口与下游",
+      "type": "row",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 51,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 199,
+      "title": "入口耗时 · p50 / p95 / p99",
+      "description": "",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 52,
+        "w": 12,
+        "h": 8
       },
       "fieldConfig": {
         "defaults": {
@@ -1429,7 +1686,87 @@
       ]
     },
     {
-      "id": 10,
+      "id": 124,
+      "title": "下游耗时 · p50 / p95 / p99",
+      "description": "点击 exemplar 查看慢操作所属 Trace；SQL 操作含读取结果的耗时。",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 52,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never"
+          },
+          "min": 0,
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "1000 * histogram_quantile(0.5,sum by(le)(rate(blog_downstream_duration_seconds_bucket{job=\"blog-api\"}[$__rate_interval])))",
+          "legendFormat": "p50",
+          "range": true,
+          "refId": "A",
+          "exemplar": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "1000 * histogram_quantile(0.95,sum by(le)(rate(blog_downstream_duration_seconds_bucket{job=\"blog-api\"}[$__rate_interval])))",
+          "legendFormat": "p95",
+          "range": true,
+          "refId": "B",
+          "exemplar": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "1000 * histogram_quantile(0.99,sum by(le)(rate(blog_downstream_duration_seconds_bucket{job=\"blog-api\"}[$__rate_interval])))",
+          "legendFormat": "p99",
+          "range": true,
+          "refId": "C",
+          "exemplar": true
+        }
+      ]
+    },
+    {
+      "id": 198,
       "title": "最慢路由 · p95",
       "description": "",
       "type": "timeseries",
@@ -1438,10 +1775,10 @@
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": 8,
+        "x": 0,
+        "y": 60,
         "w": 12,
-        "x": 12,
-        "y": 20
+        "h": 8
       },
       "fieldConfig": {
         "defaults": {
@@ -1485,128 +1822,7 @@
       ]
     },
     {
-      "id": 25,
-      "title": "API 内存趋势",
-      "description": "",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 28
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 12,
-            "showPoints": "never"
-          },
-          "min": 0,
-          "unit": "bytes"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "process_resident_memory_bytes{job=\"blog-api\"}",
-          "legendFormat": "RSS",
-          "range": true,
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "go_memstats_heap_alloc_bytes{job=\"blog-api\"}",
-          "legendFormat": "Go 堆",
-          "range": true,
-          "refId": "B"
-        }
-      ]
-    },
-    {
-      "id": 26,
-      "title": "API CPU 使用核数",
-      "description": "进程 CPU 时间消耗，1.0 表示持续占用一个 CPU 核。",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 28
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 12,
-            "showPoints": "never"
-          },
-          "min": 0,
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "rate(process_cpu_seconds_total{job=\"blog-api\"}[$__rate_interval])",
-          "legendFormat": "CPU 核数",
-          "range": true,
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 27,
+      "id": 197,
       "title": "API 数据库连接池",
       "description": "",
       "type": "timeseries",
@@ -1615,10 +1831,10 @@
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": 8,
+        "x": 12,
+        "y": 60,
         "w": 12,
-        "x": 0,
-        "y": 36
+        "h": 8
       },
       "fieldConfig": {
         "defaults": {
@@ -1683,45 +1899,68 @@
       ]
     },
     {
-      "id": 28,
-      "title": "MySQL 连接与线程",
-      "description": "",
-      "type": "timeseries",
+      "id": 125,
+      "title": "5 · 重点异常与告警 — WARN / ERROR 自动打点",
+      "type": "row",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 68,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 126,
+      "title": "WARN · 最近 5 分钟",
+      "type": "stat",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 36
+        "x": 0,
+        "y": 69,
+        "w": 4,
+        "h": 4
       },
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "thresholds"
           },
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 12,
-            "showPoints": "never"
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
           },
-          "min": 0,
           "unit": "short"
         },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
+        "textMode": "auto"
       },
       "targets": [
         {
@@ -1730,27 +1969,347 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "mysql_global_status_threads_connected{job=\"blog-mysql\"}",
-          "legendFormat": "已连接",
+          "expr": "sum(increase(blog_log_entries_total{job=\"blog-api\",level=\"warn\"}[5m])) or vector(0)",
+          "legendFormat": "",
           "range": true,
           "refId": "A"
+        }
+      ],
+      "description": "日志计数不是失败请求数。输入格式 WARN 单独显示；内部 JSON 异常用 ERROR。"
+    },
+    {
+      "id": 127,
+      "title": "ERROR · 最近 5 分钟",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 69,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
         },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "mysql_global_status_threads_running{job=\"blog-mysql\"}",
-          "legendFormat": "执行中",
+          "expr": "sum(increase(blog_log_entries_total{job=\"blog-api\",level=\"error\"}[5m])) or vector(0)",
+          "legendFormat": "",
           "range": true,
-          "refId": "B"
+          "refId": "A"
         }
-      ]
+      ],
+      "description": "日志计数不是失败请求数。输入格式 WARN 单独显示；内部 JSON 异常用 ERROR。"
     },
     {
-      "id": 29,
-      "title": "MySQL 查询速率",
+      "id": 128,
+      "title": "内部 JSON 异常 · 最近 5 分钟",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 69,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(increase(blog_log_entries_total{job=\"blog-api\",level=\"error\",event=~\"json_request_decode|json_response_encode\"}[5m])) or vector(0)",
+          "legendFormat": "",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "description": "日志计数不是失败请求数。输入格式 WARN 单独显示；内部 JSON 异常用 ERROR。"
+    },
+    {
+      "id": 129,
+      "title": "Panic · 最近 5 分钟",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 69,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(increase(blog_log_entries_total{job=\"blog-api\",event=\"panic\"}[5m])) or vector(0)",
+          "legendFormat": "",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "description": "日志计数不是失败请求数。输入格式 WARN 单独显示；内部 JSON 异常用 ERROR。"
+    },
+    {
+      "id": 130,
+      "title": "输入 JSON 格式异常 · 最近 5 分钟",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 69,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(increase(blog_log_entries_total{job=\"blog-api\",event=\"invalid_request_json\"}[5m])) or vector(0)",
+          "legendFormat": "",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "description": "日志计数不是失败请求数。输入格式 WARN 单独显示；内部 JSON 异常用 ERROR。"
+    },
+    {
+      "id": 131,
+      "title": "触发中的告警",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 69,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "count(ALERTS{alertstate=\"firing\",alertname=~\"Blog.*\"}) or vector(0)",
+          "legendFormat": "",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "description": "日志计数不是失败请求数。输入格式 WARN 单独显示；内部 JSON 异常用 ERROR。"
+    },
+    {
+      "id": 132,
+      "title": "WARN / ERROR · 按事件分类",
       "description": "",
       "type": "timeseries",
       "datasource": {
@@ -1758,10 +2317,10 @@
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 0,
-        "y": 44
+        "y": 73,
+        "w": 12,
+        "h": 8
       },
       "fieldConfig": {
         "defaults": {
@@ -1796,38 +2355,27 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(mysql_global_status_questions{job=\"blog-mysql\"}[$__rate_interval])",
-          "legendFormat": "查询 / 秒",
+          "expr": "sum by(level,event)(rate(blog_log_entries_total{job=\"blog-api\"}[$__rate_interval]))",
+          "legendFormat": "{{level}} · {{event}}",
           "range": true,
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "rate(mysql_global_status_slow_queries{job=\"blog-mysql\"}[$__rate_interval])",
-          "legendFormat": "慢查询 / 秒",
-          "range": true,
-          "refId": "B"
         }
       ]
     },
     {
-      "id": 30,
-      "title": "InnoDB 缓冲池数据量",
-      "description": "",
+      "id": 133,
+      "title": "告警状态 · pending / firing",
+      "description": "Prometheus 每 15 秒评估。此处显示状态；尚未配置 Alertmanager 或外部通知渠道。",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 12,
-        "y": 44
+        "y": 73,
+        "w": 12,
+        "h": 8
       },
       "fieldConfig": {
         "defaults": {
@@ -1841,7 +2389,7 @@
             "showPoints": "never"
           },
           "min": 0,
-          "unit": "bytes"
+          "unit": "none"
         },
         "overrides": []
       },
@@ -1862,37 +2410,26 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "mysql_global_status_innodb_buffer_pool_bytes_data{job=\"blog-mysql\"}",
-          "legendFormat": "已用数据",
+          "expr": "ALERTS{alertname=~\"Blog.*\"}",
+          "legendFormat": "{{alertname}} · {{alertstate}}",
           "range": true,
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "mysql_global_variables_innodb_buffer_pool_size{job=\"blog-mysql\"}",
-          "legendFormat": "缓冲池总量",
-          "range": true,
-          "refId": "B"
         }
       ]
     },
     {
-      "id": 11,
-      "title": "最近请求日志 · 点击 traceId 跳转 Tempo",
+      "id": 134,
+      "title": "WARN / ERROR 详情 · 点击 Trace 定位",
       "type": "logs",
       "datasource": {
         "type": "loki",
         "uid": "loki"
       },
       "gridPos": {
-        "h": 10,
-        "w": 12,
         "x": 0,
-        "y": 52
+        "y": 81,
+        "w": 24,
+        "h": 10
       },
       "options": {
         "dedupStrategy": "none",
@@ -1909,46 +2446,12 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "{service=\"api\"} | json | msg=\"http request\"",
+          "expr": "{service=\"api\"} | json | traceId=~\"${trace_id:regex}.*\" | level=~\"WARN|ERROR\"",
           "queryType": "range",
           "refId": "A"
         }
-      ]
-    },
-    {
-      "id": 12,
-      "title": "错误日志",
-      "type": "logs",
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 12,
-        "y": 52
-      },
-      "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "expr": "{service=\"api\"} | json | level=\"ERROR\"",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ]
+      ],
+      "description": "按 event 区分下游超时、内部 JSON、panic 等；顶部 trace_id 可过滤一次请求。"
     }
   ],
   "refresh": "15s",
@@ -1959,7 +2462,20 @@
     "observability"
   ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "name": "trace_id",
+        "label": "Trace ID（留空查看全部日志）",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "options": [],
+        "hide": 0
+      }
+    ]
   },
   "time": {
     "from": "now-1h",
@@ -1968,5 +2484,5 @@
   "timezone": "browser",
   "title": "博客系统 · 运行概览",
   "uid": "blog-api-overview",
-  "version": 4
+  "version": 6
 }

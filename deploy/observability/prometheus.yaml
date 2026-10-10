@@ -1,5 +1,9 @@
 global:
   scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/alerts.yaml
 
 # Alloy scrapes API/MySQL and forwards metrics, including exemplars.
 scrape_configs: []

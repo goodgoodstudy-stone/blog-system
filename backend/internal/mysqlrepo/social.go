@@ -73,7 +73,10 @@ func (s Store) AddFavorite(ctx context.Context, userID, articleID int64) error {
 	}
 	var status string
 	if err = s.DB.QueryRowContext(ctx, `SELECT status FROM articles WHERE id=?`, articleID).Scan(&status); err != nil {
-		return ErrNotFound
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		return err
 	}
 	if status != "published" {
 		return ErrNotFound

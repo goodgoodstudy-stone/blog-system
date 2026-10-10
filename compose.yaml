@@ -77,6 +77,7 @@ services:
     command: ["--config.file=/etc/prometheus/prometheus.yaml", "--storage.tsdb.path=/prometheus", "--web.enable-remote-write-receiver", "--enable-feature=exemplar-storage"]
     volumes:
       - ./deploy/observability/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - ./deploy/observability/alerts.yaml:/etc/prometheus/alerts.yaml:ro
       - prometheus_data:/prometheus
     networks: [internal]
 

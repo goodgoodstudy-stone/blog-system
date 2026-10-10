@@ -17,9 +17,11 @@ import (
 func TestInitTracerExportsOTLP(t *testing.T) {
 	previousProvider := otel.GetTracerProvider()
 	previousPropagator := otel.GetTextMapPropagator()
+	previousErrorHandler := otel.GetErrorHandler()
 	t.Cleanup(func() {
 		otel.SetTracerProvider(previousProvider)
 		otel.SetTextMapPropagator(previousPropagator)
+		otel.SetErrorHandler(previousErrorHandler)
 	})
 	received := make(chan []byte, 1)
 	collector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

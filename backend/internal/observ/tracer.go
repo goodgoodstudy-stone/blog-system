@@ -3,6 +3,7 @@ package observ
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"math"
 
 	"go.opentelemetry.io/otel"
@@ -24,6 +25,11 @@ func InitTracer(ctx context.Context, endpoint string, sampleRatio float64) (func
 		sdktrace.WithSampler(sdktrace.ParentBased(sdktrace.TraceIDRatioBased(sampleRatio))),
 	}
 	if endpoint != "" {
+		otel.SetErrorHandler(otel.ErrorHandlerFunc(func(err error) {
+			// Collector/export failures are infrastructure warnings, independent
+			// of request success; they still increment the shared log counter.
+			slog.Warn("telemetry export failed", "event", "telemetry_export", "error", err)
+		}))
 		exporter, err := otlptracehttp.New(ctx, otlptracehttp.WithEndpoint(endpoint), otlptracehttp.WithInsecure())
 		if err != nil {
 			return nil, fmt.Errorf("create OTLP exporter: %w", err)
