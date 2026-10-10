@@ -12,7 +12,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { BookOpen, Heart, LogIn, LogOut, PenLine, Shield } from "lucide-react";
-import { api } from "./api";
+import { blogRequest } from "./blog-client";
 import { useCurrentUser } from "./auth";
 import { Home, ArticleDetail, Favorites } from "./pages/Public";
 import { Login, Register } from "./pages/Auth";
@@ -33,7 +33,7 @@ function Header() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   async function logout() {
-    await api("/auth/logout", { method: "POST" });
+    await blogRequest("/auth/logout", { method: "POST" });
     qc.clear();
     navigate("/");
   }

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, LockKeyhole } from "lucide-react";
-import { api, json, type User } from "../api";
+import { blogRequest, json, type User } from "../blog-client";
 
 function AuthPage({ register }: { register: boolean }) {
   const [email, setEmail] = useState("");
@@ -13,7 +13,7 @@ function AuthPage({ register }: { register: boolean }) {
   const navigate = useNavigate();
   const mutation = useMutation({
     mutationFn: () =>
-      api<User>(register ? "/auth/register" : "/auth/login", {
+      blogRequest<User>(register ? "/auth/register" : "/auth/login", {
         method: "POST",
         body: json(
           register

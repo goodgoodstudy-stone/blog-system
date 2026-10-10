@@ -23,7 +23,7 @@ datasources:
         spanStartTimeShift: '-1m'
         spanEndTimeShift: '1m'
         customQuery: true
-        query: '{service="api"} | json | traceId="$${__span.traceId}"'
+        query: '{service="blog-server"} | json | traceId="$${__span.traceId}"'
   - name: Loki
     uid: loki
     type: loki

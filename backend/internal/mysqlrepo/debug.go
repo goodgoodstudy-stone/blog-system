@@ -11,7 +11,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// DB keeps raw SQL diagnostics local to the API process. Queries remain
+// DB keeps raw SQL diagnostics local to the blog server process. Queries remain
 // parameterized; sql and args are logged separately because database/sql does
 // not expose an interpolated statement.
 type DB struct {

@@ -10,7 +10,7 @@
     {
       "title": "系统运行概览",
       "type": "link",
-      "url": "/d/blog-api-overview",
+      "url": "/d/blog-overview",
       "keepTime": true,
       "targetBlank": false,
       "includeVars": false,
@@ -1990,5 +1990,5 @@
   "timezone": "browser",
   "title": "MySQL · 数据库健康",
   "uid": "blog-mysql-health",
-  "version": 2
+  "version": 3
 }

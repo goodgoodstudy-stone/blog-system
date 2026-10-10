@@ -35,9 +35,12 @@ export type Page<T> = {
   page: number;
   pageSize: number;
 };
-export type ApiError = { code: string; message: string };
+export type BlogRequestError = { code: string; message: string };
 
-export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function blogRequest<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
   const isForm = init.body instanceof FormData;
   const response = await fetch(`/api/v1${path}`, {
     ...init,
@@ -51,7 +54,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     const data = (await response.json().catch(() => ({
       code: "network",
       message: "请求失败，请稍后重试",
-    }))) as ApiError;
+    }))) as BlogRequestError;
     throw new Error(data.message || "请求失败");
   }
   return response.json() as Promise<T>;

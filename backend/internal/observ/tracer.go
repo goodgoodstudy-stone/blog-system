@@ -21,7 +21,7 @@ func InitTracer(ctx context.Context, endpoint string, sampleRatio float64) (func
 		return nil, fmt.Errorf("trace sample ratio must be between 0 and 1")
 	}
 	options := []sdktrace.TracerProviderOption{
-		sdktrace.WithResource(resource.NewWithAttributes(semconv.SchemaURL, semconv.ServiceName("blog-api"))),
+		sdktrace.WithResource(resource.NewWithAttributes(semconv.SchemaURL, semconv.ServiceName("blog-server"))),
 		sdktrace.WithSampler(sdktrace.ParentBased(sdktrace.TraceIDRatioBased(sampleRatio))),
 	}
 	if endpoint != "" {

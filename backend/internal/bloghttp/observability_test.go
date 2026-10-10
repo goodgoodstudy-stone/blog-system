@@ -1,4 +1,4 @@
-package httpapi
+package bloghttp
 
 import (
 	"bytes"

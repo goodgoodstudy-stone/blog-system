@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate a short, read-only API workload for the local Grafana dashboard."""
+"""Generate a short, read-only blog server workload for the local Grafana dashboard."""
 
 import argparse
 import json

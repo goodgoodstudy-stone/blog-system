@@ -1,5 +1,5 @@
-// API traces use the same collector as logs and metrics.
-otelcol.receiver.otlp "api" {
+// Blog server traces use the same collector as logs and metrics.
+otelcol.receiver.otlp "blog_server" {
   http {
     endpoint = "0.0.0.0:4318"
   }
@@ -34,9 +34,9 @@ otelcol.exporter.otlphttp "tempo" {
   }
 }
 
-prometheus.scrape "api" {
-  targets = [{"__address__" = "api:9090"}]
-  job_name = "blog-api"
+prometheus.scrape "blog_server" {
+  targets = [{"__address__" = "blog-server:9090"}]
+  job_name = "blog-server"
   scrape_interval = "15s"
   forward_to = [prometheus.remote_write.local.receiver]
 }
@@ -46,11 +46,11 @@ discovery.docker "containers" {
 
   filter {
     name   = "label"
-    values = ["com.docker.compose.service=api"]
+    values = ["com.docker.compose.service=blog-server"]
   }
 }
 
-discovery.relabel "api" {
+discovery.relabel "blog_server" {
   targets = discovery.docker.containers.targets
 
   rule {
@@ -65,10 +65,10 @@ discovery.relabel "api" {
   }
 }
 
-loki.source.docker "api" {
+loki.source.docker "blog_server" {
   host       = "unix:///var/run/docker.sock"
-  targets    = discovery.relabel.api.output
-  labels     = {"service" = "api"}
+  targets    = discovery.relabel.blog_server.output
+  labels     = {"service" = "blog-server"}
   forward_to = [loki.write.local.receiver]
 }
 

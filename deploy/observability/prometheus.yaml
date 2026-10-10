@@ -5,5 +5,5 @@ global:
 rule_files:
   - /etc/prometheus/alerts.yaml
 
-# Alloy scrapes API/MySQL and forwards metrics, including exemplars.
+# Alloy scrapes blog server/MySQL and forwards metrics, including exemplars.
 scrape_configs: []

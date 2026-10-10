@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, type User } from "./api";
+import { blogRequest, type User } from "./blog-client";
 
 export function useCurrentUser() {
   return useQuery({
     queryKey: ["me"],
-    queryFn: () => api<User>("/auth/me"),
+    queryFn: () => blogRequest<User>("/auth/me"),
     staleTime: 0,
   });
 }

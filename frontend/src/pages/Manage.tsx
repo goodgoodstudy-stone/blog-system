@@ -11,7 +11,7 @@ import {
   Upload,
 } from "lucide-react";
 import {
-  api,
+  blogRequest,
   articleUrl,
   dateTimeText,
   json,
@@ -21,7 +21,7 @@ import {
   type Page,
   type Tag,
   type User,
-} from "../api";
+} from "../blog-client";
 import { useCurrentUser } from "../auth";
 import { MarkdownView } from "./Public";
 
@@ -79,7 +79,7 @@ export function ManageArticles() {
   const { data, isPending, error } = useQuery({
     queryKey: ["manage-articles", page, status],
     queryFn: () =>
-      api<Page<Article>>(
+      blogRequest<Page<Article>>(
         `/manage/articles?${new URLSearchParams({ page: String(page), status })}`,
       ),
   });
@@ -174,7 +174,7 @@ export function ArticleEditor() {
   const id = param ? Number(param) : 0;
   const article = useQuery({
     queryKey: ["manage-article", id],
-    queryFn: () => api<Article>(`/manage/articles/${id}`),
+    queryFn: () => blogRequest<Article>(`/manage/articles/${id}`),
     enabled: id > 0,
   });
   if (id && article.isPending) return <State>正在打开编辑器…</State>;
@@ -187,7 +187,7 @@ function EditorForm({ id, initial }: { id: number; initial?: Article }) {
   const qc = useQueryClient();
   const { data: tags = [] } = useQuery({
     queryKey: ["tags"],
-    queryFn: () => api<Tag[]>("/tags"),
+    queryFn: () => blogRequest<Tag[]>("/tags"),
   });
   const [title, setTitle] = useState(initial?.title ?? "");
   const [summary, setSummary] = useState(initial?.summary ?? "");
@@ -204,7 +204,7 @@ function EditorForm({ id, initial }: { id: number; initial?: Article }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   async function save(): Promise<Article> {
-    const result = await api<Article>(
+    const result = await blogRequest<Article>(
       id ? `/manage/articles/${id}` : "/manage/articles",
       {
         method: id ? "PATCH" : "POST",
@@ -222,7 +222,9 @@ function EditorForm({ id, initial }: { id: number; initial?: Article }) {
     try {
       const saved = await save();
       if (!id) navigate(`/manage/articles/${saved.id}/edit`, { replace: true });
-      setMessage(saved.status === "published" ? "文章已保存。" : "草稿已保存。");
+      setMessage(
+        saved.status === "published" ? "文章已保存。" : "草稿已保存。",
+      );
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
@@ -243,7 +245,7 @@ function EditorForm({ id, initial }: { id: number; initial?: Article }) {
         const saved = await save();
         target = saved.id;
       }
-      const result = await api<Article>(
+      const result = await blogRequest<Article>(
         action === "delete"
           ? `/manage/articles/${target}`
           : `/manage/articles/${target}/${action}`,
@@ -275,10 +277,13 @@ function EditorForm({ id, initial }: { id: number; initial?: Article }) {
     try {
       const form = new FormData();
       form.append("file", file);
-      const result = await api<{ id: number; url: string }>("/manage/images", {
-        method: "POST",
-        body: form,
-      });
+      const result = await blogRequest<{ id: number; url: string }>(
+        "/manage/images",
+        {
+          method: "POST",
+          body: form,
+        },
+      );
       setBody((value) => value + `\n\n![${alt.trim()}](${result.url})\n`);
       setAlt("");
       setMessage("图片已插入正文，保存文章后生效。");
@@ -456,11 +461,13 @@ export function Trash() {
   const qc = useQueryClient();
   const { data, isPending } = useQuery({
     queryKey: ["trash"],
-    queryFn: () => api<Page<Article>>("/manage/trash"),
+    queryFn: () => blogRequest<Page<Article>>("/manage/trash"),
   });
   const restore = useMutation({
     mutationFn: (id: number) =>
-      api<Article>(`/manage/articles/${id}/restore`, { method: "POST" }),
+      blogRequest<Article>(`/manage/articles/${id}/restore`, {
+        method: "POST",
+      }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["trash"] });
       void qc.invalidateQueries({ queryKey: ["manage-articles"] });
@@ -504,10 +511,11 @@ export function ManageComments() {
   const qc = useQueryClient();
   const { data, isPending } = useQuery({
     queryKey: ["manage-comments"],
-    queryFn: () => api<Page<Comment>>("/manage/comments"),
+    queryFn: () => blogRequest<Page<Comment>>("/manage/comments"),
   });
   const remove = useMutation({
-    mutationFn: (id: number) => api(`/comments/${id}`, { method: "DELETE" }),
+    mutationFn: (id: number) =>
+      blogRequest(`/comments/${id}`, { method: "DELETE" }),
     onSuccess: () =>
       void qc.invalidateQueries({ queryKey: ["manage-comments"] }),
   });
@@ -552,11 +560,14 @@ export function ManageUsers() {
   const qc = useQueryClient();
   const { data = [], isPending } = useQuery({
     queryKey: ["users"],
-    queryFn: () => api<User[]>("/admin/users"),
+    queryFn: () => blogRequest<User[]>("/admin/users"),
   });
   const mutation = useMutation({
     mutationFn: ({ id, role }: { id: number; role: "reader" | "author" }) =>
-      api(`/admin/users/${id}/role`, { method: "PATCH", body: json({ role }) }),
+      blogRequest(`/admin/users/${id}/role`, {
+        method: "PATCH",
+        body: json({ role }),
+      }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["users"] }),
   });
   return (
@@ -606,7 +617,7 @@ export function ManageTags() {
   const qc = useQueryClient();
   const { data = [], isPending } = useQuery({
     queryKey: ["tags"],
-    queryFn: () => api<Tag[]>("/tags"),
+    queryFn: () => blogRequest<Tag[]>("/tags"),
   });
   const [name, setName] = useState("");
   const [error, setError] = useState("");
@@ -615,7 +626,10 @@ export function ManageTags() {
     e.preventDefault();
     setError("");
     try {
-      await api("/admin/tags", { method: "POST", body: json({ name }) });
+      await blogRequest("/admin/tags", {
+        method: "POST",
+        body: json({ name }),
+      });
       setName("");
       reload();
     } catch (e) {
@@ -626,7 +640,7 @@ export function ManageTags() {
     const next = window.prompt("新的标签名", t.name);
     if (!next || next === t.name) return;
     try {
-      await api(`/admin/tags/${t.id}`, {
+      await blogRequest(`/admin/tags/${t.id}`, {
         method: "PATCH",
         body: json({ name: next }),
       });
@@ -639,7 +653,7 @@ export function ManageTags() {
     if (!window.confirm(`删除「${t.name}」？这个标签会从所有相关文章中移除。`))
       return;
     try {
-      await api(`/admin/tags/${t.id}`, { method: "DELETE" });
+      await blogRequest(`/admin/tags/${t.id}`, { method: "DELETE" });
       reload();
     } catch (e) {
       setError((e as Error).message);

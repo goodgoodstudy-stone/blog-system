@@ -5,9 +5,9 @@ tests:
   - name: internal JSON error fires critical rules
     interval: 15s
     input_series:
-      - series: 'up{job="blog-api",instance="api:9090"}'
+      - series: 'up{job="blog-server",instance="blog-server:9090"}'
         values: '1+0x8'
-      - series: 'blog_log_entries_total{job="blog-api",instance="api:9090",level="error",event="json_response_encode"}'
+      - series: 'blog_log_entries_total{job="blog-server",instance="blog-server:9090",level="error",event="json_response_encode"}'
         values: '0+0x3 1+0x4'
     promql_expr_test:
       - expr: 'sum(ALERTS{alertname="BlogInternalJSONOrPanic",alertstate="firing",severity="critical"})'
@@ -23,9 +23,9 @@ tests:
   - name: downstream timeouts fire warning
     interval: 15s
     input_series:
-      - series: 'up{job="blog-api",instance="api:9090"}'
+      - series: 'up{job="blog-server",instance="blog-server:9090"}'
         values: '1+0x8'
-      - series: 'blog_log_entries_total{job="blog-api",instance="api:9090",level="warn",event="downstream_timeout"}'
+      - series: 'blog_log_entries_total{job="blog-server",instance="blog-server:9090",level="warn",event="downstream_timeout"}'
         values: '0+0x3 4+0x4'
     promql_expr_test:
       - expr: 'sum(ALERTS{alertname="BlogDownstreamTimeouts",alertstate="firing",severity="warning"})'
@@ -41,9 +41,9 @@ tests:
   - name: malformed client JSON does not trigger system error or warning burst
     interval: 15s
     input_series:
-      - series: 'up{job="blog-api",instance="api:9090"}'
+      - series: 'up{job="blog-server",instance="blog-server:9090"}'
         values: '1+0x12'
-      - series: 'blog_log_entries_total{job="blog-api",instance="api:9090",level="warn",event="invalid_request_json"}'
+      - series: 'blog_log_entries_total{job="blog-server",instance="blog-server:9090",level="warn",event="invalid_request_json"}'
         values: '0+0x3 100+0x9'
     promql_expr_test:
       - expr: 'sum(ALERTS{alertname=~"BlogInternalJSONOrPanic|BlogErrorLogs|BlogWarningBurst",alertstate="firing"}) or vector(0)'
@@ -54,9 +54,9 @@ tests:
   - name: infrastructure warning burst must persist for one minute
     interval: 15s
     input_series:
-      - series: 'up{job="blog-api",instance="api:9090"}'
+      - series: 'up{job="blog-server",instance="blog-server:9090"}'
         values: '1+0x12'
-      - series: 'blog_log_entries_total{job="blog-api",instance="api:9090",level="warn",event="telemetry_export"}'
+      - series: 'blog_log_entries_total{job="blog-server",instance="blog-server:9090",level="warn",event="telemetry_export"}'
         values: '0+0x3 20+0x9'
     promql_expr_test:
       - expr: 'sum(ALERTS{alertname="BlogWarningBurst",alertstate="firing"}) or vector(0)'

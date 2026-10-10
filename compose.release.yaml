@@ -19,9 +19,9 @@ services:
     networks: [internal]
 
   migrate:
-    image: ${IMAGE_PREFIX:?Set IMAGE_PREFIX}-api:${IMAGE_TAG:?Set IMAGE_TAG}
+    image: ${IMAGE_PREFIX:?Set IMAGE_PREFIX}-blog-server:${IMAGE_TAG:?Set IMAGE_TAG}
     command: ["migrate"]
-    environment: &api-env
+    environment: &blog-server-env
       DB_DSN: blog:${MYSQL_PASSWORD}@tcp(mysql:3306)/blog?parseTime=true&loc=UTC
       UPLOAD_DIR: /data/uploads
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN}
@@ -34,11 +34,11 @@ services:
         condition: service_healthy
     networks: [internal]
 
-  api:
-    image: ${IMAGE_PREFIX}-api:${IMAGE_TAG}
+  blog-server:
+    image: ${IMAGE_PREFIX}-blog-server:${IMAGE_TAG}
     restart: unless-stopped
     environment:
-      <<: *api-env
+      <<: *blog-server-env
       OTLP_ENDPOINT: ${OTLP_ENDPOINT:-} # Set alloy:4318 with the observability profile.
       TRACE_SAMPLE_RATIO: ${TRACE_SAMPLE_RATIO:-0.1}
       OBS_DEBUG_RAW: ${OBS_DEBUG_RAW:-true}
@@ -61,7 +61,7 @@ services:
     ports:
       - "${PUBLIC_BIND:-127.0.0.1}:${PUBLIC_PORT:-8080}:80"
     depends_on:
-      api:
+      blog-server:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
@@ -121,7 +121,7 @@ services:
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-local-observability-only}
-      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/blog-dashboards/api-overview.json
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/blog-dashboards/blog-overview.json
     ports:
       - "${GRAFANA_BIND:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000"
     volumes:

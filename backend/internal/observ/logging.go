@@ -29,7 +29,7 @@ type LogHandler struct {
 func NewLogHandler(next slog.Handler, registerer prometheus.Registerer) slog.Handler {
 	counts := prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "blog_log_entries_total",
-		Help: "Warning and error log records emitted by the API process.",
+		Help: "Warning and error log records emitted by the blog server process.",
 	}, []string{"level", "event"})
 	registerer.MustRegister(counts)
 	for _, event := range logEvents {
