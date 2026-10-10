@@ -1,0 +1,100 @@
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+
+  filter {
+    name   = "label"
+    values = ["com.docker.compose.service=api"]
+  }
+}
+
+discovery.relabel "api" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    regex         = "blog-engineering-(demo|release)"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "project"
+  }
+}
+
+loki.source.docker "api" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.api.output
+  labels     = {"service" = "api"}
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+discovery.docker "mysql" {
+  host = "unix:///var/run/docker.sock"
+
+  filter {
+    name   = "label"
+    values = ["com.docker.compose.service=mysql"]
+  }
+}
+
+discovery.relabel "mysql" {
+  targets = discovery.docker.mysql.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    regex         = "blog-engineering-(demo|release)"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "project"
+  }
+}
+
+loki.source.docker "mysql" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.mysql.output
+  labels     = {"service" = "mysql"}
+  forward_to = [loki.write.local.receiver]
+}
+
+// Reuse Alloy's embedded mysqld_exporter so no extra container image is needed.
+prometheus.exporter.mysql "blog" {
+  data_source_name = "blog:" + sys.env("MYSQL_PASSWORD") + "@tcp(mysql:3306)/"
+  disable_collectors = ["slave_status"]
+  enable_collectors  = ["info_schema.tables"]
+
+  info_schema.tables {
+    databases = "blog"
+  }
+}
+
+prometheus.scrape "mysql" {
+  targets         = prometheus.exporter.mysql.blog.targets
+  job_name        = "blog-mysql"
+  scrape_interval = "15s"
+  forward_to      = [prometheus.relabel.mysql.receiver]
+}
+
+prometheus.relabel "mysql" {
+  forward_to = [prometheus.remote_write.local.receiver]
+
+  rule {
+    target_label = "job"
+    replacement  = "blog-mysql"
+  }
+}
+
+prometheus.remote_write "local" {
+  endpoint {
+    url = "http://prometheus:9090/api/v1/write"
+  }
+}

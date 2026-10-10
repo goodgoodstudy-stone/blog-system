@@ -164,7 +164,7 @@ erDiagram
 4. HTTP 层校验输入长度与格式，应用层再次检查身份、文章归属和状态。管理接口不能依赖前端隐藏按钮来实现授权。
 5. Markdown 不允许原始 HTML。前端渲染时仅接受安全链接协议，正文图片只允许引用本站上传接口；评论按纯文本显示，避免脚本注入。
 6. 图片上传限制 JPG、PNG、WebP 和 10 MB，检查实际文件内容，使用随机文件名；不接受 SVG。图片由 Go API 输出，公开图片只允许属于已发布文章；草稿、已下线和回收站文章的图片仅作者或管理员可读。未绑定图片只允许上传者读取。
-7. 登录失败做基础频率限制；日志不记录密码、会话 Cookie、图片内容或完整请求正文。
+7. 登录失败做基础频率限制。本次可观测性接入按调试要求，在本地和发布 Compose 中默认开启 `OBS_DEBUG_RAW=true`，记录文本请求/响应原文与 SQL 参数、扫描结果；这些内容可能包含密码、会话相关值和文章正文，不做自动脱敏。图片等二进制内容不记录，全部 HTTP 头也未被捕获。开关、捕获边界与部署要求见 [可观测性接入方案](./OBSERVABILITY.md)。
 
 ## 7. 图片处理流程
 
@@ -179,6 +179,7 @@ blog-system/
   frontend/                 # React 应用
   backend/                  # Go API、迁移、种子数据
   deploy/nginx/             # Web 路由与 /api 代理配置
+  deploy/observability/     # Prometheus、Tempo、Loki、Alloy、Grafana 配置与看板
   docs/                     # PRD、技术方案、运行说明
   compose.yaml
   .env.example
@@ -192,7 +193,7 @@ blog-system/
 | `api` | Go HTTP 服务，提供业务 API 和图片读取 | 迁移成功 |
 | `web` | 提供 React 构建产物，代理 `/api` 到 API | API 就绪 |
 
-数据卷保存 MySQL 数据和上传图片；Web 是唯一对宿主机开放的服务，默认绑定 `127.0.0.1:8080`。前端路由由 Web 服务回退到入口页面；`/api` 直接转发，不进入前端路由。服务之间使用 Compose 内部网络。API 提供就绪检查，检查数据库连接；Web、API 和 MySQL 均配置健康检查。
+数据卷保存 MySQL 数据和上传图片；普通启动时 Web 对宿主机开放，默认绑定 `127.0.0.1:8080`。启用 `observability` profile 后 Grafana 另绑定本机 `3000` 端口，各可观测组件也使用持久化卷。前端路由由 Web 服务回退到入口页面；`/api` 直接转发，不进入前端路由。服务之间使用 Compose 内部网络。API 提供就绪检查，检查数据库连接；Web、API 和 MySQL 均配置健康检查。
 
 数据库时间统一存 UTC，前端按浏览器本地时区展示。环境配置通过 `.env.example` 说明；演示环境有可运行默认值，正式密钥和真实账号不写入仓库。
 
@@ -206,7 +207,9 @@ docker compose up --build --wait
 
 ## 9. 可观测性与验证
 
-API 输出结构化日志，包含时间、级别、请求 ID、路径、状态码和耗时；错误响应携带请求 ID 供定位。健康检查区分进程存活和依赖就绪。启动失败、迁移失败和图片写入失败给出可理解的日志，敏感信息不进入日志。
+API 输出结构化日志，包含请求 ID、Trace ID、路由模板、状态码和耗时；错误响应携带请求 ID 供定位。健康检查区分进程存活和依赖就绪。`OBS_DEBUG_RAW` 控制文本正文与 SQL 诊断记录，本地和发布 Compose 均默认开启，具体边界见 [可观测性接入方案](./OBSERVABILITY.md)。
+
+Prometheus 抓取独立内网指标端口，Tempo 接收 OTLP HTTP Trace，Grafana Alloy 采集 API/MySQL stdout 到 Loki，并通过内置 MySQL exporter 采集数据库自身状态。Grafana provisioning 加载运行概览、Go 运行时、MySQL 数据库健康三张看板，支持日志/指标到 Trace 以及 Span 到同一 Trace 日志的跳转。额外演示数据和只读流量脚本均需手动执行。当前未配置告警通知、高可用或完整的主机资源采集。
 
 | 层级 | 重点验证 |
 | --- | --- |

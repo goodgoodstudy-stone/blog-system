@@ -20,6 +20,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-sql-driver/mysql"
+	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type Server struct {
@@ -28,13 +30,14 @@ type Server struct {
 	LoginLimit *loginLimiter
 	UploadDir  string
 	Origins    map[string]struct{}
+	DebugRaw   bool
 }
 type userKey struct{}
 
-func New(s mysqlrepo.Store, uploadDir, origin, additionalOrigins string) http.Handler {
-	server := &Server{Store: s, App: application.Service{Articles: s, Social: s}, LoginLimit: newLoginLimiter(), UploadDir: uploadDir, Origins: trustedOrigins(origin, additionalOrigins)}
+func New(s mysqlrepo.Store, uploadDir, origin, additionalOrigins string, debugRaw bool) http.Handler {
+	server := &Server{Store: s, App: application.Service{Articles: s, Social: s}, LoginLimit: newLoginLimiter(), UploadDir: uploadDir, Origins: trustedOrigins(origin, additionalOrigins), DebugRaw: debugRaw}
 	r := chi.NewRouter()
-	r.Use(middleware.RequestID, middleware.RealIP, middleware.Recoverer, server.logRequests, server.authContext, server.checkOrigin)
+	r.Use(middleware.RequestID, middleware.RealIP, server.logRequests, middleware.Recoverer, server.authContext, server.checkOrigin)
 	r.Get("/api/v1/health/live", func(w http.ResponseWriter, r *http.Request) { respond(w, 200, map[string]bool{"ok": true}) })
 	r.Get("/api/v1/health/ready", server.ready)
 	r.Route("/api/v1", func(r chi.Router) {
@@ -87,14 +90,50 @@ func (s *Server) logRequests(next http.Handler) http.Handler {
 		id := middleware.GetReqID(r.Context())
 		w.Header().Set("X-Request-ID", id)
 		wrapped := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+		var requestBody captureRequestBody
+		var responseBody captureResponseBody
+		if s.DebugRaw {
+			if isTextBody(r.Header.Get("Content-Type")) && r.Body != nil {
+				requestBody.ReadCloser = r.Body
+				r.Body = &requestBody
+			}
+			responseBody.header = wrapped.Header()
+			wrapped.Tee(&responseBody)
+		}
 		next.ServeHTTP(wrapped, r)
-		if strings.HasPrefix(r.URL.Path, "/api/v1/health/") {
+		route := chi.RouteContext(r.Context()).RoutePattern()
+		if route == "" {
+			route = "unmatched"
+		}
+		status := wrapped.Status()
+		if status == 0 {
+			status = http.StatusOK
+		}
+		duration := time.Since(started)
+		httpRequests.WithLabelValues(r.Method, route, strconv.Itoa(status)).Inc()
+		spanContext := trace.SpanContextFromContext(r.Context())
+		traceID := ""
+		if spanContext.IsValid() {
+			traceID = spanContext.TraceID().String()
+		}
+		observer := httpDuration.WithLabelValues(r.Method, route)
+		if exemplarObserver, ok := observer.(prometheus.ExemplarObserver); ok && spanContext.IsSampled() {
+			exemplarObserver.ObserveWithExemplar(duration.Seconds(), prometheus.Labels{"trace_id": traceID})
+		} else {
+			observer.Observe(duration.Seconds())
+		}
+		trace.SpanFromContext(r.Context()).SetName(r.Method + " " + route)
+		if route == "/api/v1/health/live" || route == "/api/v1/health/ready" {
 			return
 		}
-		slog.Info("http request", "requestId", id, "method", r.Method, "path", r.URL.Path, "status", wrapped.Status(), "durationMs", time.Since(started).Milliseconds())
+		slog.Info("http request", "requestId", id, "traceId", traceID, "spanId", spanContext.SpanID().String(), "method", r.Method, "route", route, "status", status, "durationMs", duration.Milliseconds())
+		if s.DebugRaw {
+			logBodyChunks(r.Context(), id, "http request body", requestBody.Bytes())
+			logBodyChunks(r.Context(), id, "http response body", responseBody.Bytes())
+		}
 	})
 }
-func failErr(w http.ResponseWriter, err error) {
+func failErr(w http.ResponseWriter, r *http.Request, err error) {
 	var my *mysql.MySQLError
 	switch {
 	case errors.Is(err, mysqlrepo.ErrNotFound):
@@ -108,7 +147,12 @@ func failErr(w http.ResponseWriter, err error) {
 	case errors.As(err, &my) && my.Number == 1452:
 		fail(w, 400, "invalid_reference", "所选内容不存在")
 	default:
-		slog.Error("request failed", "error", err)
+		spanContext := trace.SpanContextFromContext(r.Context())
+		traceID := ""
+		if spanContext.IsValid() {
+			traceID = spanContext.TraceID().String()
+		}
+		slog.Error("request failed", "requestId", w.Header().Get("X-Request-ID"), "traceId", traceID, "error", err)
 		fail(w, 500, "internal", "操作失败，请稍后重试")
 	}
 }
@@ -252,16 +296,16 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	}
 	hash, err := auth.HashPassword(v.Password)
 	if err != nil {
-		failErr(w, err)
+		failErr(w, r, err)
 		return
 	}
 	u, err := s.Store.CreateUser(r.Context(), v.Email, v.Nickname, hash)
 	if err != nil {
-		failErr(w, err)
+		failErr(w, r, err)
 		return
 	}
 	if err = s.setSession(w, r, u); err != nil {
-		failErr(w, err)
+		failErr(w, r, err)
 		return
 	}
 	respond(w, 201, u)
@@ -288,7 +332,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	}
 	s.LoginLimit.reset(key)
 	if err = s.setSession(w, r, u); err != nil {
-		failErr(w, err)
+		failErr(w, r, err)
 		return
 	}
 	respond(w, 200, u)

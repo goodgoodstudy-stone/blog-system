@@ -8,6 +8,8 @@ import (
 )
 
 func (s Store) ListTags(ctx context.Context) ([]Tag, error) {
+	ctx, span := startDBSpan(ctx, "db.ListTags")
+	defer span.End()
 	rows, err := s.DB.QueryContext(ctx, `SELECT id,name FROM tags ORDER BY name`)
 	if err != nil {
 		return nil, err
@@ -155,6 +157,8 @@ func (s Store) DeleteComment(ctx context.Context, id int64) error {
 	return nil
 }
 func (s Store) ListComments(ctx context.Context, articleID int64, page, size int) (Page[Comment], error) {
+	ctx, span := startDBSpan(ctx, "db.ListComments")
+	defer span.End()
 	if page < 1 {
 		page = 1
 	}

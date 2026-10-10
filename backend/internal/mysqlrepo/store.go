@@ -14,7 +14,7 @@ var ErrNotFound = errors.New("not found")
 var ErrConflict = errors.New("conflict")
 var ErrForbidden = errors.New("forbidden")
 
-type Store struct{ DB *sql.DB }
+type Store struct{ DB *DB }
 type User struct {
 	ID           int64  `json:"id"`
 	Email        string `json:"email"`

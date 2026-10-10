@@ -17,7 +17,7 @@ func (s *Server) users(w http.ResponseWriter, r *http.Request) {
 	}
 	v, err := s.Store.ListUsers(r.Context())
 	if err != nil {
-		failErr(w, err)
+		failErr(w, r, err)
 		return
 	}
 	respond(w, 200, v)
@@ -39,12 +39,12 @@ func (s *Server) role(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err = s.Store.SetRole(r.Context(), id, v.Role); err != nil {
-		failErr(w, err)
+		failErr(w, r, err)
 		return
 	}
 	u, err := s.Store.UserByID(r.Context(), id)
 	if err != nil {
-		failErr(w, err)
+		failErr(w, r, err)
 		return
 	}
 	respond(w, 200, u)
@@ -62,7 +62,7 @@ func (s *Server) createTag(w http.ResponseWriter, r *http.Request) {
 	}
 	t, err := s.Store.CreateTag(r.Context(), v.Name)
 	if err != nil {
-		failErr(w, err)
+		failErr(w, r, err)
 		return
 	}
 	respond(w, 201, t)
@@ -84,7 +84,7 @@ func (s *Server) updateTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err = s.Store.UpdateTag(r.Context(), id, v.Name); err != nil {
-		failErr(w, err)
+		failErr(w, r, err)
 		return
 	}
 	respond(w, 200, map[string]bool{"ok": true})
@@ -99,7 +99,7 @@ func (s *Server) deleteTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err = s.Store.DeleteTag(r.Context(), id); err != nil {
-		failErr(w, err)
+		failErr(w, r, err)
 		return
 	}
 	respond(w, 200, map[string]bool{"ok": true})
@@ -124,7 +124,7 @@ func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request) {
 	buf := make([]byte, 512)
 	n, err := io.ReadFull(file, buf)
 	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
-		failErr(w, err)
+		failErr(w, r, err)
 		return
 	}
 	mime := http.DetectContentType(buf[:n])
@@ -134,23 +134,23 @@ func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, err = file.Seek(0, io.SeekStart); err != nil {
-		failErr(w, err)
+		failErr(w, r, err)
 		return
 	}
 	if err = os.MkdirAll(s.UploadDir, 0755); err != nil {
-		failErr(w, err)
+		failErr(w, r, err)
 		return
 	}
 	random := make([]byte, 16)
 	if _, err = rand.Read(random); err != nil {
-		failErr(w, err)
+		failErr(w, r, err)
 		return
 	}
 	name := hex.EncodeToString(random) + ext
 	path := filepath.Join(s.UploadDir, name)
 	out, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
-		failErr(w, err)
+		failErr(w, r, err)
 		return
 	}
 	size, err := io.Copy(out, io.LimitReader(file, 10<<20+1))
@@ -168,7 +168,7 @@ func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request) {
 	img, err := s.Store.CreateImage(r.Context(), u.ID, name, mime, size)
 	if err != nil {
 		_ = os.Remove(path)
-		failErr(w, err)
+		failErr(w, r, err)
 		return
 	}
 	respond(w, 201, map[string]any{"id": img.ID, "url": "/api/v1/images/" + strconv.FormatInt(img.ID, 10)})
@@ -181,7 +181,7 @@ func (s *Server) image(w http.ResponseWriter, r *http.Request) {
 	}
 	img, err := s.Store.GetImage(r.Context(), id)
 	if err != nil {
-		failErr(w, err)
+		failErr(w, r, err)
 		return
 	}
 	u := current(r)
