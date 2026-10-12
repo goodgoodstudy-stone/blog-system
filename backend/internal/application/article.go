@@ -7,6 +7,7 @@ import (
 
 	"blog-system/backend/internal/domain"
 	"blog-system/backend/internal/mysqlrepo"
+	"go.opentelemetry.io/otel"
 )
 
 type ArticleRepository interface {
@@ -59,6 +60,19 @@ func (s Service) Save(ctx context.Context, u mysqlrepo.User, a mysqlrepo.Article
 	return s.Articles.SaveArticle(ctx, a, tagIDs, u.ID)
 }
 func (s Service) Transition(ctx context.Context, u mysqlrepo.User, id int64, action string) (mysqlrepo.Article, error) {
+	spanName := "app.Transition"
+	switch action {
+	case "publish":
+		spanName = "app.Publish"
+	case "unpublish":
+		spanName = "app.Unpublish"
+	case "delete":
+		spanName = "app.Delete"
+	case "restore":
+		spanName = "app.Restore"
+	}
+	ctx, span := otel.Tracer("blog/application").Start(ctx, spanName)
+	defer span.End()
 	a, err := s.LoadManage(ctx, u, id)
 	if err != nil {
 		return a, err

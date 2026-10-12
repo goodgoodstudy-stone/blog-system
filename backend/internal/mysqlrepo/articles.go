@@ -10,11 +10,20 @@ import (
 	"strings"
 
 	"blog-system/backend/internal/domain"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const articleSelect = `SELECT a.id,a.author_id,u.nickname,a.title,a.summary,a.body_md,a.status,a.previous_status,a.published_at,a.deleted_at,a.created_at,a.updated_at,a.version FROM articles a JOIN users u ON u.id=a.author_id`
 
 var imageRef = regexp.MustCompile(`/api/v1/images/([0-9]+)`)
+
+func startDBSpan(ctx context.Context, name string) (context.Context, trace.Span) {
+	return otel.Tracer("blog/mysqlrepo").Start(ctx, name,
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(attribute.String("db.system.name", "mysql")))
+}
 
 func scanArticle(row interface{ Scan(...any) error }) (Article, error) {
 	var a Article
@@ -37,6 +46,8 @@ func scanArticle(row interface{ Scan(...any) error }) (Article, error) {
 	return a, nil
 }
 func (s Store) GetArticle(ctx context.Context, id, viewerID int64) (Article, error) {
+	ctx, span := startDBSpan(ctx, "db.GetArticle")
+	defer span.End()
 	a, err := scanArticle(s.DB.QueryRowContext(ctx, articleSelect+` WHERE a.id=?`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return a, ErrNotFound
@@ -50,6 +61,9 @@ func (s Store) GetArticle(ctx context.Context, id, viewerID int64) (Article, err
 	return a, nil
 }
 func (s Store) fillArticle(ctx context.Context, a *Article, viewerID int64) error {
+	ctx, span := startDBSpan(ctx, "db.LoadArticleRelations")
+	defer span.End()
+	span.SetAttributes(attribute.Int64("article.id", a.ID))
 	rows, err := s.DB.QueryContext(ctx, `SELECT t.id,t.name FROM article_tags at JOIN tags t ON t.id=at.tag_id WHERE at.article_id=? ORDER BY t.name`, a.ID)
 	if err != nil {
 		return err
@@ -89,6 +103,8 @@ type ArticleFilter struct {
 }
 
 func (s Store) ListArticles(ctx context.Context, f ArticleFilter) (Page[Article], error) {
+	ctx, span := startDBSpan(ctx, "db.ListArticles")
+	defer span.End()
 	if f.Page < 1 {
 		f.Page = 1
 	}
@@ -223,7 +239,7 @@ func plainText(md string) string {
 	re := regexp.MustCompile(`[#*_~` + "`" + `>\[\]()]`)
 	return re.ReplaceAllString(md, " ")
 }
-func bindImages(ctx context.Context, tx *sql.Tx, articleID, editorID int64, body string) error {
+func bindImages(ctx context.Context, tx *Tx, articleID, editorID int64, body string) error {
 	refs := imageRef.FindAllStringSubmatch(body, -1)
 	ids := map[int64]bool{}
 	for _, m := range refs {
@@ -263,6 +279,8 @@ func bindImages(ctx context.Context, tx *sql.Tx, articleID, editorID int64, body
 }
 
 func (s Store) UpdateArticleState(ctx context.Context, id, expectedVersion int64, d domain.Article) error {
+	ctx, span := otel.Tracer("blog/mysqlrepo").Start(ctx, "db.UpdateArticleState")
+	defer span.End()
 	var pub, del any
 	if !d.PublishedAt.IsZero() {
 		pub = d.PublishedAt

@@ -11,7 +11,7 @@ import {
   Tag as TagIcon,
 } from "lucide-react";
 import {
-  api,
+  blogRequest,
   articleUrl,
   dateText,
   json,
@@ -19,7 +19,7 @@ import {
   type Comment,
   type Page,
   type Tag,
-} from "../api";
+} from "../blog-client";
 import { useCurrentUser } from "../auth";
 
 export function MarkdownView({ body }: { body: string }) {
@@ -109,13 +109,13 @@ export function Home() {
   const { data, isPending, error } = useQuery({
     queryKey: ["articles", q, tag, page],
     queryFn: () =>
-      api<Page<Article>>(
+      blogRequest<Page<Article>>(
         `/articles?${new URLSearchParams({ q, tag, page: String(page) })}`,
       ),
   });
   const { data: tags = [] } = useQuery({
     queryKey: ["tags"],
-    queryFn: () => api<Tag[]>("/tags"),
+    queryFn: () => blogRequest<Tag[]>("/tags"),
   });
   function change(next: Record<string, string>) {
     const p = new URLSearchParams(params);
@@ -240,17 +240,18 @@ export function ArticleDetail() {
   const [message, setMessage] = useState("");
   const article = useQuery({
     queryKey: ["article", id],
-    queryFn: () => api<Article>(`/articles/${id}`),
+    queryFn: () => blogRequest<Article>(`/articles/${id}`),
     enabled: Number.isFinite(id),
   });
   const comments = useQuery({
     queryKey: ["comments", id, page],
-    queryFn: () => api<Page<Comment>>(`/articles/${id}/comments?page=${page}`),
+    queryFn: () =>
+      blogRequest<Page<Comment>>(`/articles/${id}/comments?page=${page}`),
     enabled: article.isSuccess,
   });
   const favorite = useMutation({
     mutationFn: () =>
-      api(`/favorites/${id}`, {
+      blogRequest(`/favorites/${id}`, {
         method: article.data?.favorited ? "DELETE" : "PUT",
       }),
     onSuccess: () => {
@@ -261,7 +262,7 @@ export function ArticleDetail() {
   });
   const post = useMutation({
     mutationFn: () =>
-      api<Comment>(`/articles/${id}/comments`, {
+      blogRequest<Comment>(`/articles/${id}/comments`, {
         method: "POST",
         body: json({ content: comment }),
       }),
@@ -274,7 +275,7 @@ export function ArticleDetail() {
   });
   const remove = useMutation({
     mutationFn: (commentId: number) =>
-      api(`/comments/${commentId}`, { method: "DELETE" }),
+      blogRequest(`/comments/${commentId}`, { method: "DELETE" }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["comments", id] }),
     onError: (e) => setMessage(e.message),
   });
@@ -427,10 +428,11 @@ export function Favorites() {
   const qc = useQueryClient();
   const { data, isPending } = useQuery({
     queryKey: ["favorites", page],
-    queryFn: () => api<Page<Article>>(`/favorites?page=${page}`),
+    queryFn: () => blogRequest<Page<Article>>(`/favorites?page=${page}`),
   });
   const remove = useMutation({
-    mutationFn: (id: number) => api(`/favorites/${id}`, { method: "DELETE" }),
+    mutationFn: (id: number) =>
+      blogRequest(`/favorites/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["favorites"] });
       void qc.invalidateQueries({ queryKey: ["article"] });

@@ -8,6 +8,8 @@ import (
 )
 
 func (s Store) ListTags(ctx context.Context) ([]Tag, error) {
+	ctx, span := startDBSpan(ctx, "db.ListTags")
+	defer span.End()
 	rows, err := s.DB.QueryContext(ctx, `SELECT id,name FROM tags ORDER BY name`)
 	if err != nil {
 		return nil, err
@@ -71,7 +73,10 @@ func (s Store) AddFavorite(ctx context.Context, userID, articleID int64) error {
 	}
 	var status string
 	if err = s.DB.QueryRowContext(ctx, `SELECT status FROM articles WHERE id=?`, articleID).Scan(&status); err != nil {
-		return ErrNotFound
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		return err
 	}
 	if status != "published" {
 		return ErrNotFound
@@ -155,6 +160,8 @@ func (s Store) DeleteComment(ctx context.Context, id int64) error {
 	return nil
 }
 func (s Store) ListComments(ctx context.Context, articleID int64, page, size int) (Page[Comment], error) {
+	ctx, span := startDBSpan(ctx, "db.ListComments")
+	defer span.End()
 	if page < 1 {
 		page = 1
 	}

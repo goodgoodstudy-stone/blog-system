@@ -73,18 +73,18 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish API image
+      - name: Publish blog server image
         uses: docker/build-push-action@v6
         with:
           context: ./backend
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.names.outputs.prefix }}-api:${{ github.ref_name }}
+          tags: ${{ steps.names.outputs.prefix }}-blog-server:${{ github.ref_name }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=gha,scope=api
-          cache-to: type=gha,mode=max,scope=api
+          cache-from: type=gha,scope=blog-server
+          cache-to: type=gha,mode=max,scope=blog-server
       - name: Publish Web image
         uses: docker/build-push-action@v6
         with:

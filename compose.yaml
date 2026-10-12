@@ -18,10 +18,10 @@ services:
     networks: [internal]
 
   migrate:
-    image: blog-api:local
+    image: blog-server:local
     build: ./backend
     command: ["migrate"]
-    environment: &api-env
+    environment: &blog-server-env
       DB_DSN: blog:${MYSQL_PASSWORD:-local-blog-only}@tcp(mysql:3306)/blog?parseTime=true&loc=UTC
       UPLOAD_DIR: /data/uploads
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:8080}
@@ -34,10 +34,15 @@ services:
         condition: service_healthy
     networks: [internal]
 
-  api:
-    image: blog-api:local
+  blog-server:
+    image: blog-server:local
     build: ./backend
-    environment: *api-env
+    environment:
+      <<: *blog-server-env
+      OTLP_ENDPOINT: ${OTLP_ENDPOINT:-} # Set alloy:4318 with the observability profile.
+      TRACE_SAMPLE_RATIO: ${TRACE_SAMPLE_RATIO:-1}
+      OBS_DEBUG_RAW: ${OBS_DEBUG_RAW:-true}
+      METRICS_ADDR: :9090
     volumes:
       - uploads:/data/uploads
     depends_on:
@@ -57,7 +62,7 @@ services:
     ports:
       - "127.0.0.1:${PUBLIC_PORT:-8080}:80"
     depends_on:
-      api:
+      blog-server:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
@@ -66,9 +71,71 @@ services:
       retries: 20
     networks: [internal]
 
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    profiles: [observability]
+    command: ["--config.file=/etc/prometheus/prometheus.yaml", "--storage.tsdb.path=/prometheus", "--web.enable-remote-write-receiver", "--enable-feature=exemplar-storage"]
+    volumes:
+      - ./deploy/observability/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - ./deploy/observability/alerts.yaml:/etc/prometheus/alerts.yaml:ro
+      - prometheus_data:/prometheus
+    networks: [internal]
+
+  tempo:
+    image: grafana/tempo:2.8.2
+    profiles: [observability]
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./deploy/observability/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    networks: [internal]
+
+  loki:
+    image: grafana/loki:3.5.0
+    profiles: [observability]
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    volumes:
+      - ./deploy/observability/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki_data:/loki
+    networks: [internal]
+
+  alloy:
+    image: grafana/alloy:v1.20.1
+    profiles: [observability]
+    command: ["run", "--storage.path=/var/lib/alloy/data", "/etc/alloy/config.alloy"]
+    environment:
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-local-blog-only}
+    volumes:
+      - ./deploy/observability/alloy.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy_data:/var/lib/alloy/data
+    depends_on: [loki, tempo, prometheus]
+    networks: [internal]
+
+  grafana:
+    image: grafana/grafana:12.0.2
+    profiles: [observability]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-local-observability-only}
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/blog-dashboards/blog-overview.json
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - ./deploy/observability/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+      - ./deploy/observability/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/blog-system.yaml:ro
+      - ./deploy/observability/dashboards:/etc/grafana/blog-dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on: [prometheus, tempo, loki]
+    networks: [internal]
+
 volumes:
   mysql_data:
   uploads:
+  prometheus_data:
+  tempo_data:
+  loki_data:
+  alloy_data:
+  grafana_data:
 
 networks:
   internal:

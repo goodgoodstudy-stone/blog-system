@@ -7,12 +7,12 @@
 | 触发 | 执行内容 |
 | --- | --- |
 | Push、Pull Request | Go 格式、测试和静态检查；前端 lint 与构建；使用真实 MySQL 的 Compose 集成测试。 |
-| `v1.2.3` 等版本标签 | 上述检查通过后，发布 API 和 Web 镜像到 GHCR，支持 `linux/amd64`、`linux/arm64`。 |
+| `v1.2.3` 等版本标签 | 上述检查通过后，发布博客服务和 Web 镜像到 GHCR，支持 `linux/amd64`、`linux/arm64`。 |
 
 镜像地址按仓库名自动生成：
 
 ```text
-ghcr.io/<owner>/<repo>-api:<tag>
+ghcr.io/<owner>/<repo>-blog-server:<tag>
 ghcr.io/<owner>/<repo>-web:<tag>
 ```
 
@@ -27,7 +27,7 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-Actions 的 **CI and image release** 工作流成功后，可在 GitHub Packages 中查看镜像。GHCR 包初次发布后可能默认为私有；如希望开源用户免登录拉取，需要在包设置中将 API、Web 两个包设为公开。已发布标签应保持不变；修订内容使用新版本号。
+Actions 的 **CI and image release** 工作流成功后，可在 GitHub Packages 中查看镜像。GHCR 包初次发布后可能默认为私有；如希望开源用户免登录拉取，需要在包设置中将博客服务、Web 两个包设为公开。已发布标签应保持不变；修订内容使用新版本号。
 
 ## 使用已发布镜像
 
